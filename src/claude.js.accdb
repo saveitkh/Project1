@@ -1,0 +1,42 @@
+import config from "./config.js";
+
+const CLAUDE_API_URL = "https://api.anthropic.com/v1/messages";
+
+export async function askClaude(prompt) {
+  if (!config.anthropicApiKey) {
+    throw new Error("ANTHROPIC_API_KEY is not configured");
+  }
+
+  const response = await fetch(CLAUDE_API_URL, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": config.anthropicApiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  return (
+    data.content
+      ?.filter((item) => item.type === "text")
+      .map((item) => item.text)
+      .join("") || ""
+  );
+}

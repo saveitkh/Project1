@@ -41,6 +41,7 @@ export const config = {
 
   supabaseUrl: str("SUPABASE_URL"),
   supabaseServiceKey: str("SUPABASE_SERVICE_ROLE_KEY"),
+    anthropicApiKey: str("ANTHROPIC_API_KEY"),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),
