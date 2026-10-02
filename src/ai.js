@@ -33,6 +33,7 @@ import { call } from "./notifyBot.js";
 
 const API = "https://openrouter.ai/api/v1";
 const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai";
+const GROQ_API = "https://api.groq.com/openai/v1";
 
 // One button per slot. `match` runs over OpenRouter's ids; among the matches
 // the newest (by `created`) is used. `tier` is which AI Credit price it
@@ -80,6 +81,16 @@ const GEMINI_FREE = {
   best: { km: "ឥតគិតថ្លៃ · លឿន · សំណួរប្រចាំថ្ងៃ", en: "free · fast · everyday questions" },
 };
 
+// A second, independent free pool (Groq's own, not Google's), so one
+// provider cutting its free tier -- it has happened to Gemini's before --
+// doesn't take 🆓 down entirely. No logo asset, and its name is kept out of
+// the label on purpose: "Groq" (the chip company behind this) reads exactly
+// like "Grok" (xAI's paid model, already a button above) at a glance.
+const GROQ_FREE = {
+  key: "lfree", label: "🆓 Llama Free", tier: "free", provider: "groq", vision: false,
+  best: { km: "ឥតគិតថ្លៃ · លឿនបំផុត · ជម្រើសបម្រុង", en: "free · very fast · a backup when Gemini Free is busy" },
+};
+
 // The AI keyboard's non-model buttons, both languages (a tap arrives as text).
 const BUTTONS = {
   image: { km: "🎨 បង្កើតរូបភាព", en: "🎨 Create image", emoji: null },
@@ -92,9 +103,9 @@ const BUTTONS = {
 // Slash commands that jump straight to a model or mode (see BOT_COMMANDS in
 // botText.js for the list Telegram shows).
 const COMMANDS = {
-  "/gemini_free": "gfree", "/claude": "claude", "/chatgpt": "gpt", "/gpt": "gpt", "/gemini": "gemini",
-  "/flash": "flash", "/grok": "grok", "/deepseek": "deepseek", "/image": "image", "/song": "song",
-  "/ai_credit": "credit", "/newchat": "new",
+  "/gemini_free": "gfree", "/llama_free": "lfree", "/claude": "claude", "/chatgpt": "gpt", "/gpt": "gpt",
+  "/gemini": "gemini", "/flash": "flash", "/grok": "grok", "/deepseek": "deepseek", "/image": "image",
+  "/song": "song", "/ai_credit": "credit", "/newchat": "new",
 };
 
 const SYSTEM_PROMPT = [
@@ -164,8 +175,8 @@ const TEXT = {
     imageOff: "{:fail:} មុខងារបង្កើតរូបភាពមិនទាន់បើកទេ។",
     noCredit: (need, free, paid) =>
       `{:fail:} Credit មិនគ្រប់ទេ — ត្រូវការ ${need} Credit (អ្នកមាន 🎁 ${free} + 💳 ${paid})។\n\nទិញ AI Credit បន្ថែម ឬប្ដូរទៅ 🆓 Gemini Free / Model ថោកជាង។`,
-    freeLimit: (n) => `{:fail:} 🆓 Gemini Free អស់ ${n} សារសម្រាប់ថ្ងៃនេះហើយ។ សាក Model ផ្សេង ឬត្រឡប់មកថ្ងៃស្អែក។`,
-    freeBusy: "{:fail:} 🆓 Gemini Free ពេញកម្រិតរបស់ Google បណ្ដោះអាសន្ន។ រង់ចាំមួយភ្លែត ឬសាក Model ផ្សេង។",
+    freeLimit: (n, label) => `{:fail:} ${label} អស់ ${n} សារសម្រាប់ថ្ងៃនេះហើយ។ សាក Model ផ្សេង ឬត្រឡប់មកថ្ងៃស្អែក។`,
+    freeBusy: (label) => `{:fail:} ${label} ពេញកម្រិតបណ្ដោះអាសន្ន។ រង់ចាំមួយភ្លែត ឬសាក Model ផ្សេង។`,
     thinking: "{:wait:} AI កំពុងគិត…",
     drawing: "{:wait:} កំពុងបង្កើតរូបភាព…",
     failed: "{:fail:} AI ឆ្លើយមិនបានទេ សូមសាកម្ដងទៀត ឬប្ដូរ Model។",
@@ -211,8 +222,8 @@ const TEXT = {
     imageOff: "{:fail:} Image creation isn't switched on yet.",
     noCredit: (need, free, paid) =>
       `{:fail:} Not enough Credit — this needs ${need} (you have 🎁 ${free} + 💳 ${paid}).\n\nBuy more AI Credit, or switch to 🆓 Gemini Free / a cheaper model.`,
-    freeLimit: (n) => `{:fail:} You've used today's ${n} 🆓 Gemini Free messages. Try another model, or come back tomorrow.`,
-    freeBusy: "{:fail:} 🆓 Gemini Free has hit Google's limit for now. Wait a moment, or try another model.",
+    freeLimit: (n, label) => `{:fail:} You've used today's ${n} ${label} messages. Try another model, or come back tomorrow.`,
+    freeBusy: (label) => `{:fail:} ${label} has hit its limit for now. Wait a moment, or try another model.`,
     thinking: "{:wait:} Thinking…",
     drawing: "{:wait:} Creating the image…",
     failed: "{:fail:} The AI couldn't answer. Please try again or switch model.",
@@ -230,7 +241,10 @@ const inputs = (m) => m?.architecture?.input_modalities ?? [];
 const t = (user) => TEXT[user?.language] ?? TEXT.km;
 const lang = (user) => (user?.language === "en" ? "en" : "km");
 const isAdmin = (chatId) => Boolean(config.telegramAdminChatId) && String(chatId) === String(config.telegramAdminChatId);
-const aiOn = () => Boolean(config.openrouterApiKey || config.geminiApiKey);
+const aiOn = () => Boolean(config.openrouterApiKey || config.geminiApiKey || config.groqApiKey);
+// Which daily cap a free-tier model draws from -- each provider's free
+// quota is its own pool, shared by everyone using the bot.
+const freeLimit = (m) => (m.provider === "groq" ? config.aiGroqFreeDaily : config.aiGeminiFreeDaily);
 
 // --------------------------------------------------------------- catalog
 
@@ -272,6 +286,31 @@ async function geminiFreeModel() {
   return geminiModel ?? "gemini-2.5-flash";
 }
 
+let groqModel = null;
+let groqModelAt = 0;
+
+/** A capable, current Llama on Groq (or GROQ_FREE_MODEL), for 🆓 Llama Free. */
+async function groqFreeModel() {
+  if (config.groqFreeModel) return config.groqFreeModel;
+  if (groqModel && Date.now() - groqModelAt < CATALOG_TTL_MS) return groqModel;
+  try {
+    const res = await fetch(`${GROQ_API}/models`, { headers: { authorization: `Bearer ${config.groqApiKey}` } });
+    const ids = ((await res.json())?.data ?? []).map((m) => String(m.id));
+    const bad = /guard|whisper|tts|prompt-guard|moderation|safety/i;
+    // "Versatile"/"Maverick"/70B+ reads better than the "instant" 8B tier
+    // Groq also offers; that one's for when quality doesn't matter.
+    const score = (id) => (/maverick/i.test(id) ? 3 : /70b|versatile|scout/i.test(id) ? 2 : /instant|8b/i.test(id) ? 1 : 1.5);
+    const llama = ids.filter((id) => /llama/i.test(id) && !bad.test(id)).sort((a, b) => score(b) - score(a));
+    if (llama[0]) {
+      groqModel = llama[0];
+      groqModelAt = Date.now();
+    }
+  } catch (err) {
+    console.error("Groq model list failed:", err?.message ?? err);
+  }
+  return groqModel ?? "llama-3.3-70b-versatile";
+}
+
 /**
  * The menu: the chat models in button order, then the image model (if any)
  * and the song "model" (if ElevenLabs is set). Each entry: { key, label, id,
@@ -280,6 +319,7 @@ async function geminiFreeModel() {
 export async function models() {
   const menu = [];
   if (config.geminiApiKey) menu.push({ ...GEMINI_FREE, id: await geminiFreeModel() });
+  if (config.groqApiKey) menu.push({ ...GROQ_FREE, id: await groqFreeModel() });
 
   const all = await fetchCatalog().catch((err) => {
     console.error("OpenRouter catalog failed:", err?.message ?? err);
@@ -317,7 +357,7 @@ const sessions = new Map(); // chatId -> { model, history: [{role, content}], at
 // later should still be talking to the AI, not get "that isn't a link".
 const SESSION_MS = 12 * 60 * 60_000;
 const MAX_TURNS = 8;
-const freeUses = new Map(); // userId -> { day, count } for 🆓 Gemini Free
+const freeUses = new Map(); // "<provider>:<userId>" -> { day, count }, one pool per free provider
 const noTools = new Set(); // model ids that refused the tools parameter
 
 function session(chatId) {
@@ -339,19 +379,20 @@ export function cancel(chatId) {
   sessions.delete(chatId);
 }
 
-/** One 🆓 Gemini Free message; false once today's per-person cap is used. */
-function takeFree(chatId, userId) {
-  if (isAdmin(chatId) || !config.aiGeminiFreeDaily) return true;
+/** One message on a free model; false once today's per-person cap is used. */
+function takeFree(chatId, userId, provider, limit) {
+  if (isAdmin(chatId) || !limit) return true;
+  const key = `${provider}:${userId}`;
   const day = new Date().toISOString().slice(0, 10);
-  const u = freeUses.get(userId);
+  const u = freeUses.get(key);
   const count = u?.day === day ? u.count : 0;
-  if (count >= config.aiGeminiFreeDaily) return false;
-  freeUses.set(userId, { day, count: count + 1 });
+  if (count >= limit) return false;
+  freeUses.set(key, { day, count: count + 1 });
   return true;
 }
 
-function giveBackFree(userId) {
-  const u = freeUses.get(userId);
+function giveBackFree(userId, provider) {
+  const u = freeUses.get(`${provider}:${userId}`);
   if (u?.count) u.count -= 1;
 }
 
@@ -361,11 +402,14 @@ function giveBackFree(userId) {
 function aiKeyboard(menu, user) {
   const l = lang(user);
   const btn = (text, emoji) => ({ text, ...(emoji ? { emoji } : {}) });
-  const chats = chatModels(menu).map((m) => btn(m.label, m.emoji));
+  const chatMenu = chatModels(menu);
+  const chats = chatMenu.map((m) => btn(m.label, m.emoji));
   const rows = [];
-  // 🆓 Gemini Free gets a row of its own at the top: the one anyone can use.
-  if (chats[0] && menu[0]?.key === "gfree") rows.push([chats.shift()]);
-  for (let i = 0; i < chats.length; i += 2) rows.push(chats.slice(i, i + 2));
+  // Every free model gets a row of its own at the top: the ones anyone can
+  // use, before the paid ones start pairing up.
+  let i = 0;
+  while (i < chatMenu.length && chatMenu[i].tier === "free") rows.push([chats[i++]]);
+  for (; i < chats.length; i += 2) rows.push(chats.slice(i, i + 2));
   const tools = [];
   if (imageModel(menu)) tools.push(btn(BUTTONS.image[l], BUTTONS.image.emoji));
   if (menu.some((m) => m.song)) tools.push(btn(BUTTONS.song[l], BUTTONS.song.emoji));
@@ -393,7 +437,7 @@ function buttonFor(text, menu) {
 
 async function priceList(menu, c, user) {
   const tx = t(user);
-  const price = (m) => (m.tier === "free" ? `${tx.perMsg(0)} (${tx.freeLine(config.aiGeminiFreeDaily)})` : `${c[m.tier] ?? 0}`);
+  const price = (m) => (m.tier === "free" ? `${tx.perMsg(0)} (${tx.freeLine(freeLimit(m))})` : `${c[m.tier] ?? 0}`);
   const logo = (m) => (m.emoji ? `{:${m.emoji}:}` : m.label.split(" ")[0]);
   const name = (m) => m.label.replace(/^\S+\s/, "");
   const lines = chatModels(menu).map((m) => `${logo(m)} ${name(m)} — ${price(m)}`);
@@ -408,7 +452,7 @@ async function priceList(menu, c, user) {
 async function capabilityCard(model, menu, user) {
   const tx = t(user);
   const c = await aiCredits.costs();
-  const price = model.tier === "free" ? `${tx.perMsg(0)} · ${tx.freeLine(config.aiGeminiFreeDaily)}` : tx.perMsg(c[model.tier] ?? 0);
+  const price = model.tier === "free" ? `${tx.perMsg(0)} · ${tx.freeLine(freeLimit(model))}` : tx.perMsg(c[model.tier] ?? 0);
   const lines = [tx.capChat, model.vision ? tx.capVision : tx.capNoVision];
   if (imageModel(menu)) lines.push(tx.capImage(c.image));
   if (menu.some((m) => m.song)) lines.push(tx.capSong(c.song));
@@ -674,11 +718,12 @@ export async function handleMessage(chatId, user, text, photo) {
   const userId = user.telegram_user_id;
   let refund;
   if (s.model.tier === "free") {
-    if (!takeFree(chatId, userId)) {
-      await call("sendMessage", { chat_id: chatId, text: tx.freeLimit(config.aiGeminiFreeDaily) });
+    const limit = freeLimit(s.model);
+    if (!takeFree(chatId, userId, s.model.provider, limit)) {
+      await call("sendMessage", { chat_id: chatId, text: tx.freeLimit(limit, s.model.label) });
       return true;
     }
-    refund = async () => giveBackFree(userId);
+    refund = async () => giveBackFree(userId, s.model.provider);
   } else {
     refund = await pay(chatId, user, (await aiCredits.costs())[s.model.tier] ?? 0);
     if (!refund) return true;
@@ -701,7 +746,7 @@ export async function handleMessage(chatId, user, text, photo) {
     console.error(`AI (${s.model.id}) failed:`, err?.message ?? err);
     await done();
     await refund();
-    await call("sendMessage", { chat_id: chatId, text: err?.quota ? tx.freeBusy : tx.failed });
+    await call("sendMessage", { chat_id: chatId, text: err?.quota ? tx.freeBusy(s.model.label) : tx.failed });
     return true;
   }
   await done();
@@ -740,26 +785,38 @@ export async function handleMessage(chatId, user, text, photo) {
  * refuses the `tools` parameter is retried without it (and remembered).
  * A rate-limit from Google's free tier throws an error with `quota` set.
  */
+// Everything OpenAI-compatible SaveIt AI can talk to. `url`/`key` pick the
+// endpoint and credential; `noMaxTokens` is for Gemini's thinking models,
+// which count thinking against max_tokens and can come back empty under a
+// cap; `label` and `quota429` are for the error a failure throws.
+const PROVIDERS = {
+  openrouter: {
+    url: `${API}/chat/completions`, key: () => config.openrouterApiKey, label: "OpenRouter",
+    headers: () => ({ ...(config.publicUrl ? { "HTTP-Referer": config.publicUrl } : {}), "X-Title": "SaveIt Bot" }),
+  },
+  google: {
+    url: `${GEMINI_API}/chat/completions`, key: () => config.geminiApiKey, label: "Gemini",
+    headers: () => ({}), noMaxTokens: true, quota429: true,
+  },
+  groq: {
+    url: `${GROQ_API}/chat/completions`, key: () => config.groqApiKey, label: "Groq",
+    headers: () => ({}), quota429: true,
+  },
+};
+
 async function complete(model, messages, { wantImage = false, tools = [] } = {}) {
-  const google = model.provider === "google";
+  const p = PROVIDERS[model.provider] ?? PROVIDERS.openrouter;
   const useTools = tools.length && !wantImage && !noTools.has(model.id);
   const body = {
     model: model.id,
     messages,
-    // Gemini's thinking models count thinking against max_tokens and can
-    // come back empty under a cap, so Google gets none.
-    ...(google || wantImage ? {} : { max_tokens: 2000 }),
+    ...(p.noMaxTokens || wantImage ? {} : { max_tokens: 2000 }),
     ...(wantImage ? { modalities: ["image", "text"] } : {}),
     ...(useTools ? { tools, tool_choice: "auto" } : {}),
   };
-  const res = await fetch(google ? `${GEMINI_API}/chat/completions` : `${API}/chat/completions`, {
+  const res = await fetch(p.url, {
     method: "POST",
-    headers: {
-      authorization: `Bearer ${google ? config.geminiApiKey : config.openrouterApiKey}`,
-      "content-type": "application/json",
-      ...(!google && config.publicUrl ? { "HTTP-Referer": config.publicUrl } : {}),
-      ...(google ? {} : { "X-Title": "SaveIt Bot" }),
-    },
+    headers: { authorization: `Bearer ${p.key()}`, "content-type": "application/json", ...p.headers() },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(120_000),
   });
@@ -771,8 +828,8 @@ async function complete(model, messages, { wantImage = false, tools = [] } = {})
       noTools.add(model.id);
       return complete(model, messages, { wantImage, tools: [] });
     }
-    const err = new Error(`${google ? "Gemini" : "OpenRouter"} ${res.status}: ${detail}`);
-    if (google && res.status === 429) err.quota = true;
+    const err = new Error(`${p.label} ${res.status}: ${detail}`);
+    if (p.quota429 && res.status === 429) err.quota = true;
     throw err;
   }
   const message = data.choices?.[0]?.message ?? {};
@@ -927,15 +984,16 @@ function chunk(text, size) {
 
 /** /aimodels for the operator: which model each button uses right now. */
 export async function describeModels() {
-  if (!aiOn()) return "⚠️ Neither OPENROUTER_API_KEY nor GEMINI_API_KEY is set.";
+  if (!aiOn()) return "⚠️ None of OPENROUTER_API_KEY, GEMINI_API_KEY or GROQ_API_KEY is set.";
   const menu = await models();
   const c = await aiCredits.costs();
-  const price = (m) => (m.tier === "free" ? `free, ${config.aiGeminiFreeDaily}/person/day` : `${c[m.tier]} Credit`);
-  const source = (m) => (m.song ? "ElevenLabs music_v1" : m.provider === "google" ? `Google ${m.id}` : m.id);
+  const price = (m) => (m.tier === "free" ? `free, ${freeLimit(m)}/person/day` : `${c[m.tier]} Credit`);
+  const source = (m) => (m.song ? "ElevenLabs music_v1" : m.provider ? `${PROVIDERS[m.provider]?.label ?? m.provider} ${m.id}` : m.id);
   const lines = menu.map((m) => `${m.label} · ${price(m)}\n  ${source(m)}${noTools.has(m.id) ? " (no tools)" : ""}`);
   const off = [];
-  if (!config.geminiApiKey) off.push("🆓 off: GEMINI_API_KEY not set");
-  if (!config.openrouterApiKey) off.push("OpenRouter models off: OPENROUTER_API_KEY not set");
+  if (!config.geminiApiKey) off.push("🆓 Gemini Free off: GEMINI_API_KEY not set");
+  if (!config.groqApiKey) off.push("🆓 Llama Free off: GROQ_API_KEY not set");
+  if (!config.openrouterApiKey) off.push("Paid models off: OPENROUTER_API_KEY not set");
   if (!config.elevenlabsApiKey) off.push("🎵 off: ELEVENLABS_API_KEY not set");
   return lines.length
     ? `${lines.join("\n")}\n\nFree a day: ${config.aiFreeDaily} Credit${off.length ? `\n${off.join("\n")}` : ""}`

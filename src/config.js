@@ -69,6 +69,13 @@ export const config = {
   geminiApiKey: str("GEMINI_API_KEY"),
   geminiFreeModel: str("GEMINI_FREE_MODEL"),
   aiGeminiFreeDaily: int("AI_GEMINI_FREE_DAILY", 20),
+  // 🆓 Llama Free: Groq's own free tier (groq.com -> API Keys), no card
+  // needed, no cost ever (unlike Gemini's, which Google has cut before).
+  // Its free quota is also one pool for the whole bot, hence a daily cap
+  // per person too. Kept well under Groq's org-wide ceiling by default.
+  groqApiKey: str("GROQ_API_KEY"),
+  groqFreeModel: str("GROQ_FREE_MODEL"),
+  aiGroqFreeDaily: int("AI_GROQ_FREE_DAILY", 15),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),

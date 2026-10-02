@@ -29,6 +29,7 @@ else
   if [ -z "$missing" ]; then pass ".env មានតម្លៃចាំបាច់គ្រប់"; else fail ".env ខ្វះ:$missing" "nano .env   រួច   bash update.sh"; fi
   [ -z "$(env_get OPENROUTER_API_KEY)" ] && warn "OPENROUTER_API_KEY ទទេ — គ្មាន Claude / ChatGPT / Gemini Pro / Grok / DeepSeek"
   [ -z "$(env_get GEMINI_API_KEY)" ] && warn "GEMINI_API_KEY ទទេ — គ្មាន 🆓 Gemini Free"
+  [ -z "$(env_get GROQ_API_KEY)" ] && warn "GROQ_API_KEY ទទេ — គ្មាន 🆓 Llama Free"
   [ -z "$(env_get ELEVENLABS_API_KEY)" ] && warn "ELEVENLABS_API_KEY ទទេ — គ្មានប៊ូតុង 🎵 បង្កើតចម្រៀង"
 fi
 

@@ -152,6 +152,8 @@ Telegram bot webhook set to https://.../api/telegram-bot/webhook
 | `401` / `Unauthorized` (OpenRouter) | `OPENROUTER_API_KEY` ខុស | ដាក់ key ត្រឹមត្រូវ → `docker compose up -d` |
 | `Gemini 400` / `API key not valid` | `GEMINI_API_KEY` ខុស | យក key ថ្មីពី aistudio.google.com |
 | `Gemini 429` | 🆓 Gemini Free ពេញកម្រិតរបស់ Google (ចែករំលែកទាំង bot) | ធម្មតា — រង់ចាំ ឬបន្ថយ `AI_GEMINI_FREE_DAILY` |
+| `Groq 401` | `GROQ_API_KEY` ខុស | យក key ថ្មីពី console.groq.com |
+| `Groq 429` | 🆓 Llama Free ពេញកម្រិតរបស់ Groq (ចែករំលែកទាំង bot) | ធម្មតា — រង់ចាំ ឬបន្ថយ `AI_GROQ_FREE_DAILY` |
 | `402` / `Insufficient credits` (OpenRouter) | លុយក្នុង OpenRouter អស់ | បញ្ចូលលុយនៅ openrouter.ai |
 | `ElevenLabs 401` | `ELEVENLABS_API_KEY` ខុស | ដាក់ key ត្រឹមត្រូវ |
 | `ElevenLabs 402` / `quota` | Plan ElevenLabs អស់ credit | បង់ / upgrade plan |

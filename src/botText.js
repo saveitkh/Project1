@@ -173,13 +173,14 @@ const SEP = "━━━━━━━━━━━━━━";
 
 /** The welcome card's SaveIt AI block -- only once AI is switched on. */
 function aiIntro(language) {
-  if (!config.openrouterApiKey && !config.geminiApiKey) return "";
+  if (!config.openrouterApiKey && !config.geminiApiKey && !config.groqApiKey) return "";
   const km = language !== "en";
   const song = config.elevenlabsApiKey ? (km ? " · {:ai_elevenlabs:} បង្កើតចម្រៀង" : " · {:ai_elevenlabs:} Create songs") : "";
   const logos = config.openrouterApiKey ? "{:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}" : "{:ai_gemini:}";
-  const free = config.geminiApiKey
-    ? km ? `      🆓 Gemini Free — ឥតគិតថ្លៃ ${config.aiGeminiFreeDaily} សារ/ថ្ងៃ\n` : `      🆓 Gemini Free — ${config.aiGeminiFreeDaily} free messages a day\n`
-    : "";
+  const freeLines = [];
+  if (config.geminiApiKey) freeLines.push(km ? `      🆓 Gemini Free — ឥតគិតថ្លៃ ${config.aiGeminiFreeDaily} សារ/ថ្ងៃ\n` : `      🆓 Gemini Free — ${config.aiGeminiFreeDaily} free messages a day\n`);
+  if (config.groqApiKey) freeLines.push(km ? `      🆓 Llama Free — ឥតគិតថ្លៃ ${config.aiGroqFreeDaily} សារ/ថ្ងៃ\n` : `      🆓 Llama Free — ${config.aiGroqFreeDaily} free messages a day\n`);
+  const free = freeLines.join("");
   return km
     ? `{:sparkle:} SaveIt AI — ថ្មី!\n` +
         `      ${logos}\n` +
@@ -204,6 +205,7 @@ export const BOT_COMMANDS = {
     ["start", "🏠 ម៉ឺនុយដើម"],
     ["ai", "🤖 SaveIt AI"],
     ["gemini_free", "🆓 Gemini ឥតគិតថ្លៃ"],
+    ["llama_free", "🆓 Llama ឥតគិតថ្លៃ"],
     ["claude", "🧠 Claude"],
     ["chatgpt", "⚡ ChatGPT"],
     ["gemini", "💎 Gemini Pro"],
@@ -223,6 +225,7 @@ export const BOT_COMMANDS = {
     ["start", "🏠 Main menu"],
     ["ai", "🤖 SaveIt AI"],
     ["gemini_free", "🆓 Free Gemini"],
+    ["llama_free", "🆓 Free Llama"],
     ["claude", "🧠 Claude"],
     ["chatgpt", "⚡ ChatGPT"],
     ["gemini", "💎 Gemini Pro"],
