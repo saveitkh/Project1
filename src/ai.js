@@ -27,11 +27,14 @@ const API = "https://openrouter.ai/api/v1";
 // matches the newest (by OpenRouter's `created`) is used. `image: true`
 // means the slot draws pictures instead of answering in text; `tier` is
 // which AI Credit price it charges (aiCredits.costs()).
+// `emoji` is a token into customEmoji.js's pack (the real provider logo,
+// once /makeemoji has built it); the plain glyph in `label` is what shows
+// until then, and what stays if the owner has no Telegram Premium.
 const SLOTS = [
-  { key: "claude", label: "🧠 Claude", tier: "premium", match: (id) => /^anthropic\/claude-/.test(id) && !/haiku|:free|:thinking/.test(id) },
-  { key: "gpt", label: "⚡ ChatGPT", tier: "premium", match: (id) => /^openai\/gpt-\d/.test(id) && !/mini|nano|oss|audio|image|search|codex|chat|:free/.test(id) },
-  { key: "gemini", label: "💎 Gemini Pro", tier: "premium", match: (id) => /^google\/gemini-[\d.]+-pro/.test(id) && !/image|:free/.test(id) },
-  { key: "flash", label: "🚀 Gemini Flash", tier: "cheap", match: (id) => /^google\/gemini-[\d.]+-flash/.test(id) && !/lite|image|:free/.test(id) },
+  { key: "claude", label: "🧠 Claude", tier: "premium", emoji: "ai_claude", match: (id) => /^anthropic\/claude-/.test(id) && !/haiku|:free|:thinking/.test(id) },
+  { key: "gpt", label: "⚡ ChatGPT", tier: "premium", emoji: "ai_openai", match: (id) => /^openai\/gpt-\d/.test(id) && !/mini|nano|oss|audio|image|search|codex|chat|:free/.test(id) },
+  { key: "gemini", label: "💎 Gemini Pro", tier: "premium", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-pro/.test(id) && !/image|:free/.test(id) },
+  { key: "flash", label: "🚀 Gemini Flash", tier: "cheap", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-flash/.test(id) && !/lite|image|:free/.test(id) },
   { key: "grok", label: "🛰 Grok", tier: "premium", match: (id) => /^x-ai\/grok-\d/.test(id) && !/mini|fast|code|vision|:free/.test(id) },
   { key: "deepseek", label: "🐋 DeepSeek", tier: "cheap", match: (id) => /^deepseek\/deepseek-/.test(id) && !/distill|coder|prover|:free/.test(id) },
   { key: "image", label: "🎨 បង្កើតរូបភាព · Create image", tier: "image", image: true, match: (id, m) => outputs(m).includes("image") && !/:free/.test(id) },
@@ -52,7 +55,7 @@ const IMAGE_PROMPT =
 
 // The song button isn't an OpenRouter model: lyrics come from the best text
 // model in the menu, the music from ElevenLabs.
-const SONG = { key: "song", label: "🎵 បង្កើតចម្រៀង · Create song", tier: "song", song: true };
+const SONG = { key: "song", label: "🎵 បង្កើតចម្រៀង · Create song", tier: "song", song: true, emoji: "ai_elevenlabs" };
 
 const LYRICS_PROMPT = [
   "You write songs for an AI singer. From the user's request, write an original song and return ONLY JSON, no other text:",
@@ -169,7 +172,7 @@ export async function models() {
   const menu = [];
   for (const slot of SLOTS) {
     const m = newestFirst.find((x) => slot.match(x.id, x) && (slot.image || outputs(x).includes("text")));
-    if (m) menu.push({ key: slot.key, label: slot.label, id: m.id, tier: slot.tier, image: Boolean(slot.image), vision: inputs(m).includes("image") });
+    if (m) menu.push({ key: slot.key, label: slot.label, id: m.id, tier: slot.tier, emoji: slot.emoji, image: Boolean(slot.image), vision: inputs(m).includes("image") });
   }
   if (config.elevenlabsApiKey) menu.push(SONG);
   return menu;
@@ -217,7 +220,7 @@ export async function ask(chatId, user) {
   }
   if (!menu.length) return call("sendMessage", { chat_id: chatId, text: tx.noModels });
   const c = await aiCredits.costs();
-  const button = (m) => ({ text: `${m.label} · ${c[m.tier] ?? 0}`, callback_data: `ai:m:${m.key}` });
+  const button = (m) => ({ text: `${m.label} · ${c[m.tier] ?? 0}`, ...(m.emoji ? { emoji: m.emoji } : {}), callback_data: `ai:m:${m.key}` });
   const rows = [];
   const textModels = menu.filter((m) => !m.image && !m.song);
   for (let i = 0; i < textModels.length; i += 2) rows.push(textModels.slice(i, i + 2).map(button));

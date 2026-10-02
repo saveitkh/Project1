@@ -87,6 +87,11 @@ export const EMOJI = {
   bulb: ["bulb", "💡"],
   party: ["party", "🎉"],
   warn: ["warn", "⚠️"],
+  // SaveIt AI's model picker (ai.js) -- each provider's own logo.
+  ai_claude: ["ai_claude", "🧠"],
+  ai_openai: ["ai_openai", "⚡"],
+  ai_gemini: ["ai_gemini", "✨"],
+  ai_elevenlabs: ["ai_elevenlabs", "🎙️"],
 };
 
 // {:name:} is one of EMOJI; {:1234...:} is any custom emoji by its id (one a
