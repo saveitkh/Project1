@@ -69,6 +69,7 @@ const MENU = [
     en: "🌐 Translate",
     aliases: ["🌐 Translate · ខ្មែរ ⇄ English"],
   },
+  { action: "ai", emoji: "sparkle", style: "primary", km: "🤖 SaveIt AI", en: "🤖 SaveIt AI", aliases: ["🤖 AI"] },
   {
     action: "buy",
     emoji: "credit",
@@ -139,7 +140,7 @@ export function mainKeyboard(language) {
     [button("free"), button("premium")],
     config.khInvoiceBridgeSecret ? [button("invoice"), button("emoji")] : [button("emoji")],
     [button("translate"), button("watch")],
-    [button("account")],
+    [button("ai"), button("account")],
     [button("buy")],
     [button("referral")],
   ];

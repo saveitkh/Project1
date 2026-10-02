@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 
 import { config } from "./config.js";
 import { actionForLabel, languageKeyboard, mainKeyboard, progressBar, texts } from "./botText.js";
+import * as ai from "./ai.js";
 import * as botDeliver from "./botDeliver.js";
 import * as botJobs from "./botJobs.js";
 import * as botPay from "./botPay.js";
@@ -297,6 +298,21 @@ export async function handleMessage(message) {
   // A photo is a payment screenshot, or -- from the operator, captioned
   // /setqr -- the bank QR orders are built from. Checked before the text
   // handling below, since a photo usually has no text at all.
+  // A photo (or text) while a SaveIt AI model is chosen goes to the AI --
+  // ahead of the payment handler, which would otherwise claim any photo.
+  if (message.photo && !actionForLabel(text)) {
+    const caption = String(message.caption ?? "").trim();
+    if (ai.isActive(chatId)) {
+      let photo = null;
+      try {
+        photo = await fetchTelegramPhoto(message.photo[message.photo.length - 1].file_id);
+      } catch (err) {
+        console.error("AI photo download failed:", err?.message ?? err);
+      }
+      if (await ai.handleMessage(chatId, user, caption, photo)) return;
+    }
+  }
+
   if (message.photo && (await botPay.handlePhoto(message, user))) return;
 
   // A message forwarded out of the storage channel names it, so the operator
@@ -330,6 +346,7 @@ export async function handleMessage(message) {
     watch.cancelPending(chatId);
     if (action !== "emoji") emojiMaker.cancel(chatId);
     if (action !== "translate") translate.cancel(chatId);
+    if (action !== "ai") ai.cancel(chatId);
     // A new section replaces the last one: its screens and the tapped
     // button's own message go, so only what was just asked for is shown.
     await clearScreens(chatId, message.message_id);
@@ -339,6 +356,8 @@ export async function handleMessage(message) {
       return emojiMaker.ask(chatId, user);
     case "translate":
       return translate.ask(chatId, user);
+    case "ai":
+      return ai.ask(chatId, user);
     case "invoice":
       return khInvoice.enterSection(chatId, user);
     case "watch":
@@ -366,6 +385,8 @@ export async function handleMessage(message) {
     default:
       break;
   }
+
+  if (await ai.handleMessage(chatId, user, text, null)) return;
 
   const url = URL_PATTERN.exec(text)?.[0];
   if (url) {
@@ -406,6 +427,15 @@ export async function handleMessage(message) {
  */
 async function handleAdminCommand(chatId, text) {
   if (!config.telegramAdminChatId || String(chatId) !== String(config.telegramAdminChatId)) return false;
+
+  if (text === "/aimodels") {
+    try {
+      await send(chatId, await ai.describeModels());
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
 
   if (text === "/stats") {
     const users = rows(await db().from("bot_users").select("telegram_user_id, created_at"));
@@ -655,6 +685,7 @@ function commandAction(text) {
     case "/invoice": return "invoice";
     case "/emoji": return "emoji";
     case "/translate": return "translate";
+    case "/ai": return "ai";
     default: return null;
   }
 }
@@ -671,6 +702,9 @@ export async function handleCallback(cq) {
     const user = await ensureUser(cq.from, null);
     await call("answerCallbackQuery", { callback_query_id: cq.id });
     return botPay.showPackages(cq.message.chat.id, user, await quotaFor(user));
+  }
+  if (data.startsWith("ai:") && cq.from?.id) {
+    return ai.handleCallback(cq, await ensureUser(cq.from, null));
   }
   if (data.startsWith("watch:") && cq.from?.id) {
     return watch.handleCallback(cq, await ensureUser(cq.from, null));

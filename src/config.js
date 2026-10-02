@@ -41,7 +41,22 @@ export const config = {
 
   supabaseUrl: str("SUPABASE_URL"),
   supabaseServiceKey: str("SUPABASE_SERVICE_ROLE_KEY"),
-    anthropicApiKey: str("ANTHROPIC_API_KEY"),
+  anthropicApiKey: str("ANTHROPIC_API_KEY"),
+
+  // SaveIt AI (ai.js), through OpenRouter. Unset key = the AI button says
+  // it's off. AI_MODELS ("id|Label,id|Label") replaces the auto-picked menu;
+  // AI_DAILY_LIMIT caps uses per person per day (0 = no cap; the operator is
+  // never capped).
+  openrouterApiKey: str("OPENROUTER_API_KEY"),
+  aiModels: str("AI_MODELS")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const [id, label] = entry.split("|").map((x) => x.trim());
+      return { id, label: label || id };
+    }),
+  aiDailyLimit: int("AI_DAILY_LIMIT", 30),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),
