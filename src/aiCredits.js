@@ -8,11 +8,14 @@
  *     (bot_packages rows with the "ai_" prefix, granted by botPay.grant);
  *   - the operator is never charged.
  *
- * What each kind of use costs is AI_COSTS ("cheap=1,premium=3,image=5,
- * song=25"). Balances live in Supabase Storage (bucket "ai-credits") as
- * one JSON file, the same pattern watch.js uses for Watch Credit -- this
- * service has no migration path into the database. Writes are queued
- * in-process so two quick messages can't both read the old balance.
+ * What each kind of use costs starts from AI_COSTS ("cheap=1,premium=3,
+ * image=5,song=25") but the operator can raise or lower it live from the
+ * bot with /setprices, once usage grows past what the env default
+ * budgeted for -- no redeploy needed. Balances live in Supabase Storage
+ * (bucket "ai-credits") as one JSON file, the same pattern watch.js uses
+ * for Watch Credit -- this service has no migration path into the
+ * database. Writes are queued in-process so two quick messages can't both
+ * read the old balance.
  */
 import { config } from "./config.js";
 import { db, rows } from "./db.js";
@@ -33,14 +36,24 @@ const PACKAGES = [
 ];
 
 const DEFAULT_COSTS = { cheap: 1, premium: 3, image: 5, song: 25 };
+export const TIERS = Object.keys(DEFAULT_COSTS);
 
-export function costs() {
+function envCosts() {
   const out = { ...DEFAULT_COSTS };
   for (const pair of String(config.aiCosts ?? "").split(",")) {
     const [k, v] = pair.split("=").map((x) => x?.trim());
     if (k in out && Number.isFinite(Number(v)) && Number(v) >= 0) out[k] = Number(v);
   }
   return out;
+}
+
+/** AI_COSTS, with whatever /setprices has overridden on top. */
+export async function costs() {
+  const overrides = await readPrices().catch((err) => {
+    console.error("AI prices read failed, using env defaults:", err?.message ?? err);
+    return {};
+  });
+  return { ...envCosts(), ...overrides };
 }
 
 const L = {
@@ -138,6 +151,63 @@ function update(fn) {
   return run;
 }
 
+// ----------------------------------------------------------------- prices
+
+const PRICE_FILE = "prices.json";
+const PRICE_CACHE_MS = 20_000;
+let priceCache = null;
+let priceCachedAt = 0;
+
+/** The kind -> Credit overrides /setprices has saved, or {} once none are set. */
+async function readPrices() {
+  if (priceCache && Date.now() - priceCachedAt < PRICE_CACHE_MS) return priceCache;
+  const storage = db().storage.from(BUCKET);
+  const { data: blob, error } = await storage.download(PRICE_FILE);
+  let data;
+  if (blob && !error) {
+    data = JSON.parse(await blob.text()) ?? {};
+  } else {
+    // Same rule as the wallet: a file that's genuinely missing is "no
+    // overrides yet", but a passing read error must never be taken as
+    // "clear every price back to the env default".
+    const listed = await storage.list("", { search: PRICE_FILE });
+    const missing = listed.error
+      ? /bucket not found/i.test(String(listed.error.message ?? listed.error))
+      : !(listed.data ?? []).some((f) => f.name === PRICE_FILE);
+    if (!missing && !priceCache) throw new Error(`Could not read AI prices: ${error?.message ?? error ?? "unknown"}`);
+    data = missing ? {} : priceCache;
+  }
+  priceCache = data;
+  priceCachedAt = Date.now();
+  return priceCache;
+}
+
+async function writePrices(data) {
+  const storage = db().storage;
+  const body = new Blob([JSON.stringify(data)], { type: "application/json" });
+  let { error } = await storage.from(BUCKET).upload(PRICE_FILE, body, { upsert: true, contentType: "application/json" });
+  if (error && /bucket not found|not found/i.test(String(error.message ?? error))) {
+    await storage.createBucket(BUCKET, { public: false });
+    ({ error } = await storage.from(BUCKET).upload(PRICE_FILE, body, { upsert: true, contentType: "application/json" }));
+  }
+  if (error) throw new Error(`Could not save AI prices: ${error.message ?? error}`);
+  priceCache = data;
+  priceCachedAt = Date.now();
+}
+
+/** /setprices <kind>=<credit>: sets one tier's price, live, no redeploy. */
+export async function setPrice(kind, credit) {
+  if (!TIERS.includes(kind)) throw new Error(`Unknown price kind "${kind}" (use ${TIERS.join(", ")})`);
+  if (!Number.isFinite(credit) || credit < 0) throw new Error(`Price must be a number ≥ 0, got "${credit}"`);
+  const next = { ...(await readPrices()), [kind]: credit };
+  await writePrices(next);
+}
+
+/** /setprices reset: back to whatever AI_COSTS says. */
+export async function resetPrices() {
+  await writePrices({});
+}
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** { free, paid } left right now for one user. */
@@ -203,7 +273,7 @@ export async function grantedText(language, credits, user) {
 /** The balance, prices and the packs to buy. */
 export async function showTopUps(chatId, user) {
   const s = t(user?.language);
-  const { free, paid } = await balance(user.telegram_user_id);
+  const [{ free, paid }, c] = await Promise.all([balance(user.telegram_user_id), costs()]);
   const list = rows(await db().from("bot_packages").select("*").like("id", `${AI_PACKAGE_PREFIX}%`).eq("active", true).order("sort"));
   const keyboard = list.map((pkg) => [
     { text: user?.language === "en" ? pkg.title_en : pkg.title_km, emoji: "credit", style: "success", callback_data: `bot:buy:${pkg.id}` },
@@ -211,7 +281,7 @@ export async function showTopUps(chatId, user) {
   keyboard.push([{ text: s.back, callback_data: "ai:pick" }]);
   return call("sendMessage", {
     chat_id: chatId,
-    text: s.balance(free, paid, config.aiFreeDaily) + s.price(costs()) + s.pick,
+    text: s.balance(free, paid, config.aiFreeDaily) + s.price(c) + s.pick,
     reply_markup: { inline_keyboard: keyboard },
   });
 }

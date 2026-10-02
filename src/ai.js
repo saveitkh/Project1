@@ -216,7 +216,7 @@ export async function ask(chatId, user) {
     return call("sendMessage", { chat_id: chatId, text: tx.noModels });
   }
   if (!menu.length) return call("sendMessage", { chat_id: chatId, text: tx.noModels });
-  const c = aiCredits.costs();
+  const c = await aiCredits.costs();
   const button = (m) => ({ text: `${m.label} · ${c[m.tier] ?? 0}`, callback_data: `ai:m:${m.key}` });
   const rows = [];
   const textModels = menu.filter((m) => !m.image && !m.song);
@@ -302,7 +302,7 @@ export async function handleMessage(chatId, user, text, photo) {
   }
 
   const userId = user.telegram_user_id;
-  const cost = aiCredits.costs()[s.model.tier] ?? 0;
+  const cost = (await aiCredits.costs())[s.model.tier] ?? 0;
   let receipt;
   try {
     receipt = await aiCredits.charge(chatId, userId, cost);
@@ -542,7 +542,7 @@ function chunk(text, size) {
 export async function describeModels() {
   if (!config.openrouterApiKey) return "⚠️ OPENROUTER_API_KEY is not set.";
   const menu = await models();
-  const c = aiCredits.costs();
+  const c = await aiCredits.costs();
   const lines = menu.map((m) => `${m.label} · ${c[m.tier]} Credit\n  ${m.song ? "ElevenLabs music_v1" : m.id}`);
   return lines.length
     ? `${lines.join("\n")}\n\nFree a day: ${config.aiFreeDaily} Credit${config.elevenlabsApiKey ? "" : "\n🎵 off: ELEVENLABS_API_KEY not set"}`

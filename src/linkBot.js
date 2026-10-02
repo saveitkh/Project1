@@ -438,6 +438,52 @@ async function handleAdminCommand(chatId, text) {
     return true;
   }
 
+  // /setprices [reset | cheap=2 premium=4 image=6 song=25]: the Credit cost
+  // of each tier, live -- when real usage runs ahead of what AI_COSTS
+  // budgeted for, this changes it without a redeploy. No args shows the
+  // current table; /setprices reset drops back to AI_COSTS.
+  const setPrices = /^\/setprices(?:\s+(.*))?$/i.exec(text);
+  if (setPrices) {
+    const arg = (setPrices[1] ?? "").trim();
+    const priceTable = (c) => `cheap=${c.cheap} premium=${c.premium} image=${c.image} song=${c.song}`;
+    try {
+      if (/^reset$/i.test(arg)) {
+        await aiCredits.resetPrices();
+        await send(chatId, `✅ Reset to AI_COSTS.\n${priceTable(await aiCredits.costs())}`);
+        return true;
+      }
+      if (!arg) {
+        await send(
+          chatId,
+          `💲 Current prices (Credit per use)\n${priceTable(await aiCredits.costs())}\n\n` +
+            `Set: /setprices cheap=2 premium=4 image=6 song=25\nReset: /setprices reset`
+        );
+        return true;
+      }
+      const applied = [];
+      const bad = [];
+      for (const pair of arg.split(/[\s,]+/).filter(Boolean)) {
+        const [kind, value] = pair.split("=").map((x) => x?.trim());
+        if (!aiCredits.TIERS.includes(kind) || !Number.isFinite(Number(value)) || Number(value) < 0) {
+          bad.push(pair);
+          continue;
+        }
+        await aiCredits.setPrice(kind, Number(value));
+        applied.push(pair);
+      }
+      const table = priceTable(await aiCredits.costs());
+      await send(
+        chatId,
+        (applied.length ? `✅ Set: ${applied.join(" ")}\n` : "") +
+          (bad.length ? `⚠️ Ignored (want cheap/premium/image/song=number≥0): ${bad.join(" ")}\n` : "") +
+          `\n💲 Now: ${table}`
+      );
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
+
   // /aigive <telegram user id> <credits>: AI Credit by hand (a refund, a
   // gift, or a paid order whose grant failed). Negative takes it back.
   const aiGive = /^\/aigive\s+(\d+)\s+(-?\d+)$/.exec(text);
@@ -451,7 +497,13 @@ async function handleAdminCommand(chatId, text) {
     return true;
   }
   if (text === "/aigive" || text === "/aicredit") {
-    await send(chatId, "/aigive <telegram user id> <credits> — add (or, negative, remove) AI Credit\n/aicredit <telegram user id> — show a balance\n/aimodels — models, prices, free Credit");
+    await send(
+      chatId,
+      "/aigive <telegram user id> <credits> — add (or, negative, remove) AI Credit\n" +
+        "/aicredit <telegram user id> — show a balance\n" +
+        "/setprices — show or change the Credit cost per use\n" +
+        "/aimodels — models, prices, free Credit"
+    );
     return true;
   }
   const aiCredit = /^\/aicredit\s+(\d+)$/.exec(text);
