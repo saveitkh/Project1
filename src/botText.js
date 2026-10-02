@@ -68,21 +68,30 @@ const MENU = [
     en: "🌐 Translate",
     aliases: ["🌐 Translate · ខ្មែរ ⇄ English"],
   },
-  { action: "ai", emoji: "sparkle", style: "success", km: "🤖 SaveIt AI", en: "🤖 SaveIt AI", aliases: ["🤖 AI"] },
+  // The headline row of the dashboard: one wide green button that names the
+  // models, so the newest feature is the first thing anyone sees.
+  {
+    action: "ai",
+    emoji: "sparkle",
+    style: "success",
+    km: "🤖 SaveIt AI · Claude · ChatGPT · Gemini",
+    en: "🤖 SaveIt AI · Claude · ChatGPT · Gemini",
+    aliases: ["🤖 SaveIt AI", "🤖 AI"],
+  },
   {
     action: "buy",
     emoji: "credit",
     style: "success",
-    km: "💲 បញ្ចូល Credit សម្រាប់ Download Private",
-    en: "💲 Add Credit for Private Downloads",
-    aliases: ["💲 បន្ថែម Credit", "💲 Add Credit", "💎 ទិញ VIP", "💎 Buy VIP", "💎 ទិញ / VIP", "💎 Buy / VIP"],
+    km: "💲 បញ្ចូល Credit",
+    en: "💲 Add Credit",
+    aliases: ["💲 បញ្ចូល Credit សម្រាប់ Download Private", "💲 Add Credit for Private Downloads", "💲 បន្ថែម Credit", "💲 Add Credit", "💎 ទិញ VIP", "💎 Buy VIP", "💎 ទិញ / VIP", "💎 Buy / VIP"],
   },
   {
     action: "referral",
     emoji: "invite",
-    km: "🎁 ណែនាំមិត្ត · ទទួល Free Credit",
-    en: "🎁 Invite friends · Get Free Credit",
-    aliases: ["👥 ណែនាំមិត្ត", "👥 Referral"],
+    km: "🎁 ណែនាំមិត្ត",
+    en: "🎁 Invite friends",
+    aliases: ["🎁 ណែនាំមិត្ត · ទទួល Free Credit", "🎁 Invite friends · Get Free Credit", "👥 ណែនាំមិត្ត", "👥 Referral"],
   },
   // Kept for the commands and older keyboards; now reached from Account.
   { action: "history", emoji: "m_history", km: "📜 ប្រវត្តិ", en: "📜 History" },
@@ -135,14 +144,16 @@ export function mainKeyboard(language) {
     return { text: item[language] ?? item.en, emoji: item.emoji, ...(item.style ? { style: item.style } : {}) };
   };
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
-  // Only what people use every day; history, language and help are under
-  // Account. Open App closes the list.
+  // The dashboard, top to bottom: the AI headline, then pairs grouped by
+  // what they're for -- downloading, watching & words, tools, your account
+  // -- with the colour on the one button of each pair people tap most.
+  // History, language and help live under Account; Open App closes the list.
   const rows = [
+    [button("ai")],
     [button("free"), button("premium")],
+    [button("watch"), button("translate")],
     config.khInvoiceBridgeSecret ? [button("invoice"), button("emoji")] : [button("emoji")],
-    [button("translate"), button("watch")],
-    [button("ai"), button("account")],
-    [button("buy")],
+    [button("buy"), button("account")],
     [button("referral")],
   ];
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
@@ -158,17 +169,39 @@ export function languageKeyboard() {
   };
 }
 
+const SEP = "━━━━━━━━━━━━━━";
+
+/** The welcome card's SaveIt AI block -- only once AI is switched on. */
+function aiIntro(language) {
+  if (!config.openrouterApiKey) return "";
+  const km = language !== "en";
+  const song = config.elevenlabsApiKey ? (km ? " · {:ai_elevenlabs:} បង្កើតចម្រៀង" : " · {:ai_elevenlabs:} Create songs") : "";
+  return km
+    ? `{:sparkle:} SaveIt AI — ថ្មី!\n` +
+        `      {:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}\n` +
+        `      សួរអ្វីក៏បាន · ផ្ញើរូបឲ្យ AI មើល\n` +
+        `      {:camera:} បង្កើតរូបភាព${song}\n` +
+        `      {:gift:} ${config.aiFreeDaily} Credit ឥតគិតថ្លៃរៀងរាល់ថ្ងៃ\n\n`
+    : `{:sparkle:} SaveIt AI — new!\n` +
+        `      {:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}\n` +
+        `      Ask anything · send a photo for the AI to read\n` +
+        `      {:camera:} Create images${song}\n` +
+        `      {:gift:} ${config.aiFreeDaily} free Credit every day\n\n`;
+}
+
 const TEXT = {
   km: {
     welcome: (name) =>
-      `{:logo:} សួស្តី ${name}! នេះជា {:brand:} SaveIt KH\n\n` +
-      `ខ្ញុំជួយទាញយកវីដេអូ និងបទចម្រៀង៖\n\n` +
-      `{:m_free:} SaveIt Free — ឥតគិតថ្លៃ មិនកំណត់ {:m_free:}\n` +
+      `{:logo:} សួស្តី ${name}! សូមស្វាគមន៍មកកាន់ {:brand:} SaveIt KH\n` +
+      `${SEP}\n` +
+      aiIntro("km") +
+      `{:m_free:} ទាញយកវីដេអូ — ឥតគិតថ្លៃ មិនកំណត់\n` +
       `      {:yt:} {:fb:} {:ig:} {:tt:} {:x:}\n\n` +
-      `{:m_pro:} SaveIt Pro — Telegram (ក្រុម/channel ឯកជន)\n` +
-      `      {:gift:} សាកល្បងឥតគិតថ្លៃ 10 វីដេអូ\n` +
-      `      {:video:} វីដេអូពេញទំហំ គ្មានកម្រិត 50MB\n\n` +
-      `គ្រាន់តែ ផ្ញើតំណមក ខ្ញុំធ្វើនៅសល់។`,
+      `{:m_pro:} Telegram ឯកជន — ក្រុម/channel បិទ\n` +
+      `      {:gift:} សាកល្បងឥតគិតថ្លៃ 10 វីដេអូ\n\n` +
+      `{:video:} រឿងនិយាយខ្មែរ · {:m_language:} បកប្រែ · {:sparkle:} Emoji Maker\n` +
+      `${SEP}\n` +
+      `{:bulb:} ផ្ញើតំណវីដេអូមក ឬជ្រើសប៊ូតុងខាងក្រោម {:dl:}`,
     help:
       `{:m_help:} របៀបប្រើ\n\n` +
       `1️⃣ ចម្លងតំណវីដេអូ (YouTube, Facebook, TikTok, Telegram…)\n` +
@@ -266,14 +299,16 @@ const TEXT = {
   },
   en: {
     welcome: (name) =>
-      `{:logo:} Hi ${name}! This is {:brand:} SaveIt KH\n\n` +
-      `I download videos and songs:\n\n` +
-      `{:m_free:} SaveIt Free — free & unlimited {:m_free:}\n` +
+      `{:logo:} Hi ${name}! Welcome to {:brand:} SaveIt KH\n` +
+      `${SEP}\n` +
+      aiIntro("en") +
+      `{:m_free:} Video download — free & unlimited\n` +
       `      {:yt:} {:fb:} {:ig:} {:tt:} {:x:}\n\n` +
-      `{:m_pro:} SaveIt Pro — Telegram (private groups/channels)\n` +
-      `      {:gift:} 10 videos free to try\n` +
-      `      {:video:} Full-size video, no 50MB limit\n\n` +
-      `Just send me a link and I'll do the rest.`,
+      `{:m_pro:} Private Telegram — closed groups/channels\n` +
+      `      {:gift:} 10 videos free to try\n\n` +
+      `{:video:} Khmer-dubbed shows · {:m_language:} Translate · {:sparkle:} Emoji Maker\n` +
+      `${SEP}\n` +
+      `{:bulb:} Send a video link, or pick a button below {:dl:}`,
     help:
       `{:m_help:} How to use\n\n` +
       `1️⃣ Copy a video link (YouTube, Facebook, TikTok, Telegram…)\n` +

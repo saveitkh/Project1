@@ -92,6 +92,8 @@ export const EMOJI = {
   ai_openai: ["ai_openai", "⚡"],
   ai_gemini: ["ai_gemini", "✨"],
   ai_elevenlabs: ["ai_elevenlabs", "🎙️"],
+  ai_grok: ["ai_grok", "🛰️"],
+  ai_deepseek: ["ai_deepseek", "🐋"],
 };
 
 // {:name:} is one of EMOJI; {:1234...:} is any custom emoji by its id (one a

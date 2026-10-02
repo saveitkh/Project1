@@ -35,8 +35,8 @@ const SLOTS = [
   { key: "gpt", label: "⚡ ChatGPT", tier: "premium", emoji: "ai_openai", match: (id) => /^openai\/gpt-\d/.test(id) && !/mini|nano|oss|audio|image|search|codex|chat|:free/.test(id) },
   { key: "gemini", label: "💎 Gemini Pro", tier: "premium", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-pro/.test(id) && !/image|:free/.test(id) },
   { key: "flash", label: "🚀 Gemini Flash", tier: "cheap", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-flash/.test(id) && !/lite|image|:free/.test(id) },
-  { key: "grok", label: "🛰 Grok", tier: "premium", match: (id) => /^x-ai\/grok-\d/.test(id) && !/mini|fast|code|vision|:free/.test(id) },
-  { key: "deepseek", label: "🐋 DeepSeek", tier: "cheap", match: (id) => /^deepseek\/deepseek-/.test(id) && !/distill|coder|prover|:free/.test(id) },
+  { key: "grok", label: "🛰 Grok", tier: "premium", emoji: "ai_grok", match: (id) => /^x-ai\/grok-\d/.test(id) && !/mini|fast|code|vision|:free/.test(id) },
+  { key: "deepseek", label: "🐋 DeepSeek", tier: "cheap", emoji: "ai_deepseek", match: (id) => /^deepseek\/deepseek-/.test(id) && !/distill|coder|prover|:free/.test(id) },
   { key: "image", label: "🎨 បង្កើតរូបភាព · Create image", tier: "image", image: true, match: (id, m) => outputs(m).includes("image") && !/:free/.test(id) },
 ];
 
