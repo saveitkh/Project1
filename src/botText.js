@@ -68,15 +68,15 @@ const MENU = [
     en: "🌐 Translate",
     aliases: ["🌐 Translate · ខ្មែរ ⇄ English"],
   },
-  // The headline row of the dashboard: one wide green button that names the
-  // models, so the newest feature is the first thing anyone sees.
+  // The headline row of the dashboard: one wide green button. The robot
+  // stays a plain emoji (no logo icon); the models live on the AI's own
+  // keyboard and in the / command list.
   {
     action: "ai",
-    emoji: "sparkle",
     style: "success",
-    km: "🤖 SaveIt AI · Claude · ChatGPT · Gemini",
-    en: "🤖 SaveIt AI · Claude · ChatGPT · Gemini",
-    aliases: ["🤖 SaveIt AI", "🤖 AI"],
+    km: "🤖 SaveIt AI",
+    en: "🤖 SaveIt AI",
+    aliases: ["🤖 SaveIt AI · Claude · ChatGPT · Gemini", "🤖 AI"],
   },
   {
     action: "buy",
@@ -173,21 +173,72 @@ const SEP = "━━━━━━━━━━━━━━";
 
 /** The welcome card's SaveIt AI block -- only once AI is switched on. */
 function aiIntro(language) {
-  if (!config.openrouterApiKey) return "";
+  if (!config.openrouterApiKey && !config.geminiApiKey) return "";
   const km = language !== "en";
   const song = config.elevenlabsApiKey ? (km ? " · {:ai_elevenlabs:} បង្កើតចម្រៀង" : " · {:ai_elevenlabs:} Create songs") : "";
+  const logos = config.openrouterApiKey ? "{:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}" : "{:ai_gemini:}";
+  const free = config.geminiApiKey
+    ? km ? `      🆓 Gemini Free — ឥតគិតថ្លៃ ${config.aiGeminiFreeDaily} សារ/ថ្ងៃ\n` : `      🆓 Gemini Free — ${config.aiGeminiFreeDaily} free messages a day\n`
+    : "";
   return km
     ? `{:sparkle:} SaveIt AI — ថ្មី!\n` +
-        `      {:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}\n` +
+        `      ${logos}\n` +
         `      សួរអ្វីក៏បាន · ផ្ញើរូបឲ្យ AI មើល\n` +
         `      {:camera:} បង្កើតរូបភាព${song}\n` +
+        free +
         `      {:gift:} ${config.aiFreeDaily} Credit ឥតគិតថ្លៃរៀងរាល់ថ្ងៃ\n\n`
     : `{:sparkle:} SaveIt AI — new!\n` +
-        `      {:ai_claude:} {:ai_openai:} {:ai_gemini:} {:ai_grok:} {:ai_deepseek:}\n` +
+        `      ${logos}\n` +
         `      Ask anything · send a photo for the AI to read\n` +
         `      {:camera:} Create images${song}\n` +
+        free +
         `      {:gift:} ${config.aiFreeDaily} free Credit every day\n\n`;
 }
+
+/**
+ * The list Telegram shows when someone types "/" (setMyCommands, at
+ * startup). Khmer for Khmer-language Telegram apps, English otherwise.
+ */
+export const BOT_COMMANDS = {
+  km: [
+    ["start", "🏠 ម៉ឺនុយដើម"],
+    ["ai", "🤖 SaveIt AI"],
+    ["gemini_free", "🆓 Gemini ឥតគិតថ្លៃ"],
+    ["claude", "🧠 Claude"],
+    ["chatgpt", "⚡ ChatGPT"],
+    ["gemini", "💎 Gemini Pro"],
+    ["flash", "🚀 Gemini Flash"],
+    ["grok", "🛰 Grok"],
+    ["deepseek", "🐋 DeepSeek"],
+    ["image", "🎨 បង្កើតរូបភាព"],
+    ["song", "🎵 បង្កើតចម្រៀង"],
+    ["newchat", "🔄 ចាប់ផ្ដើមការសន្ទនា AI ថ្មី"],
+    ["ai_credit", "💳 AI Credit · ទិញបន្ថែម"],
+    ["free", "⬇️ ទាញយកវីដេអូ"],
+    ["translate", "🌐 បកប្រែភាសា"],
+    ["account", "👤 គណនី"],
+    ["help", "❓ ជំនួយ"],
+  ],
+  en: [
+    ["start", "🏠 Main menu"],
+    ["ai", "🤖 SaveIt AI"],
+    ["gemini_free", "🆓 Free Gemini"],
+    ["claude", "🧠 Claude"],
+    ["chatgpt", "⚡ ChatGPT"],
+    ["gemini", "💎 Gemini Pro"],
+    ["flash", "🚀 Gemini Flash"],
+    ["grok", "🛰 Grok"],
+    ["deepseek", "🐋 DeepSeek"],
+    ["image", "🎨 Create image"],
+    ["song", "🎵 Create song"],
+    ["newchat", "🔄 New AI chat"],
+    ["ai_credit", "💳 AI Credit · buy more"],
+    ["free", "⬇️ Download videos"],
+    ["translate", "🌐 Translate"],
+    ["account", "👤 Account"],
+    ["help", "❓ Help"],
+  ],
+};
 
 const TEXT = {
   km: {

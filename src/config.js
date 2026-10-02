@@ -61,6 +61,14 @@ export const config = {
   aiFreeDaily: int("AI_FREE_DAILY", 5),
   aiCosts: str("AI_COSTS"),
   aiSongSeconds: int("AI_SONG_SECONDS", 120),
+  // 🆓 Gemini Free: Google's own free Gemini API tier (a key from
+  // aistudio.google.com), costing no AI Credit. Google's free quota is per
+  // project -- shared by every user of the bot -- so each person also gets
+  // at most AI_GEMINI_FREE_DAILY messages a day. GEMINI_FREE_MODEL pins a
+  // model; unset picks Google's newest Flash.
+  geminiApiKey: str("GEMINI_API_KEY"),
+  geminiFreeModel: str("GEMINI_FREE_MODEL"),
+  aiGeminiFreeDaily: int("AI_GEMINI_FREE_DAILY", 20),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),

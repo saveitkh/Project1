@@ -150,6 +150,8 @@ Telegram bot webhook set to https://.../api/telegram-bot/webhook
 |---|---|---|
 | `SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set` | `.env` ខ្វះ key Supabase | `nano .env` បំពេញ → `docker compose up -d` |
 | `401` / `Unauthorized` (OpenRouter) | `OPENROUTER_API_KEY` ខុស | ដាក់ key ត្រឹមត្រូវ → `docker compose up -d` |
+| `Gemini 400` / `API key not valid` | `GEMINI_API_KEY` ខុស | យក key ថ្មីពី aistudio.google.com |
+| `Gemini 429` | 🆓 Gemini Free ពេញកម្រិតរបស់ Google (ចែករំលែកទាំង bot) | ធម្មតា — រង់ចាំ ឬបន្ថយ `AI_GEMINI_FREE_DAILY` |
 | `402` / `Insufficient credits` (OpenRouter) | លុយក្នុង OpenRouter អស់ | បញ្ចូលលុយនៅ openrouter.ai |
 | `ElevenLabs 401` | `ELEVENLABS_API_KEY` ខុស | ដាក់ key ត្រឹមត្រូវ |
 | `ElevenLabs 402` / `quota` | Plan ElevenLabs អស់ credit | បង់ / upgrade plan |
@@ -167,7 +169,7 @@ Telegram bot webhook set to https://.../api/telegram-bot/webhook
 | ពាក្យបញ្ជា | ប្រើធ្វើអ្វី |
 |---|---|
 | `/makeemoji` | បង្កើត pack logo ឡើងវិញ (ក្រោយបន្ថែម logo ថ្មី) — ត្រូវការ Telegram Premium |
-| `/aimodels` | មើល model AI ប៊ូតុងនីមួយៗ + តម្លៃ |
+| `/aimodels` | មើល model AI ប៊ូតុងនីមួយៗ + តម្លៃ (រួមទាំង 🆓 Gemini Free) |
 | `/setprices` | មើល/កែតម្លៃ Credit · ឧ. `/setprices premium=4 song=30` |
 | `/aigive <user id> <ចំនួន>` | បន្ថែម AI Credit ឲ្យអ្នកប្រើ |
 | `/aicredit <user id>` | មើល Credit អ្នកប្រើ |

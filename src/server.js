@@ -20,6 +20,7 @@ import * as forwarder from "./forwarder.js";
 import * as khInvoice from "./khInvoice.js";
 import * as watch from "./watch.js";
 import * as aiCredits from "./aiCredits.js";
+import { BOT_COMMANDS } from "./botText.js";
 import { handleCallback as handleBotCallback, handleMessage as handleLinkBotMessage } from "./linkBot.js";
 import * as translate from "./translate.js";
 import { recordManualUpload } from "./library.js";
@@ -1055,6 +1056,11 @@ async function registerBotWebhook() {
     if (result?.ok) console.log(`Telegram bot webhook set to ${url}`);
   } catch (err) {
     console.error("Could not set the Telegram bot webhook:", err?.message ?? err);
+  }
+  // What Telegram lists when someone types "/" -- the AI's models among them.
+  for (const [language, list] of Object.entries(BOT_COMMANDS)) {
+    const commands = list.map(([command, description]) => ({ command, description }));
+    await botApi("setMyCommands", { commands, ...(language === "en" ? {} : { language_code: language }) }).catch(() => null);
   }
   // The button beside the message box: always in view, and a Mini App opened
   // from it receives the signed initData (a reply-keyboard one does not).

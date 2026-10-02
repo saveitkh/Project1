@@ -326,6 +326,8 @@ export async function handleMessage(message) {
   if (startPayload && (await khInvoice.handleStart(chatId, user, startPayload))) return;
 
   if (/^\/start\b/.test(text) || text === "/help" || !text) {
+    // The main menu is back on screen, so the AI stops listening.
+    ai.cancel(chatId);
     const name = from.first_name || from.username || "";
     await send(chatId, t.welcome(name), { reply_markup: mainKeyboard(user.language) });
     return;
@@ -333,6 +335,16 @@ export async function handleMessage(message) {
 
   if (await handleAdminCommand(chatId, text)) return;
   if (await botPay.handleAdminPayCommand(chatId, text)) return;
+
+  // The AI's own keyboard (a model, 🎨, 🎵, new chat, ⬅️ menu) and its
+  // slash commands (/claude, /image, …).
+  if (await ai.handleButton(chatId, user, text)) {
+    khInvoice.cancelPending(chatId);
+    watch.cancelPending(chatId);
+    emojiMaker.cancel(chatId);
+    translate.cancel(chatId);
+    return;
+  }
 
   if (await khInvoice.handleSectionButton(chatId, user, text, mainKeyboard(user.language))) return;
 

@@ -1,61 +1,120 @@
 /**
- * SaveIt AI: tap "🤖 AI", pick a model, then send text or a photo (with or
- * without a caption) and get the answer back -- or pick the image model and
- * describe a picture to have it drawn, or tap 🎵 and describe a song to have
- * it written (lyrics by a text model) and sung (ElevenLabs Music).
+ * SaveIt AI -- an AI app inside the bot. Tap "🤖 SaveIt AI" (or /ai) and the
+ * keyboard under the message box turns into the AI's own: one button per
+ * model, plus 🎨 / 🎵 / new chat / AI Credit / back to the main menu. Then
+ * just talk to it:
  *
- * Every use is paid for in AI Credit (aiCredits.js): a few free a day, then
- * bought Credit -- a cheap model costs less than a premium one, and a
- * failed answer is refunded.
+ *   - text      -> an answer;
+ *   - a photo   -> the model looks at it (caption optional);
+ *   - "draw…"   -> the model calls create_image and a picture comes back;
+ *   - "a song…" -> the model calls create_song: lyrics, then ElevenLabs sings.
  *
- * Everything goes through OpenRouter (one key, every provider). The model
- * buttons aren't hard-coded ids: each slot below is matched against
- * OpenRouter's live catalog and the newest model that fits it wins, so the
- * menu keeps up with new releases without a deploy. AI_MODELS overrides the
- * whole list ("id|Label,id|Label") when the operator wants specific ones.
+ * So every chat model can do everything, the way the Gemini / ChatGPT apps
+ * do, without the person having to know which mode to pick. 🎨 and 🎵 stay
+ * as direct modes for whoever wants them.
  *
- * State (chosen model, the last few turns) is in memory on purpose: a
- * restart just means the next message starts a fresh conversation.
+ * Models come from two places:
+ *   - 🆓 Gemini Free: Google's own free API tier (GEMINI_API_KEY). Costs no
+ *     AI Credit; capped per person per day, because Google's free quota is
+ *     one pool for the whole bot.
+ *   - everything else through OpenRouter. The buttons aren't hard-coded ids:
+ *     each slot is matched against OpenRouter's live catalog and the newest
+ *     fit wins, so the menu keeps up with new releases without a deploy.
+ *     AI_MODELS overrides that list ("id|Label,id|Label").
+ *
+ * Every paid use is charged in AI Credit (aiCredits.js) and refunded when it
+ * fails. State (model, last few turns) is in memory on purpose: a restart
+ * just starts a fresh conversation.
  */
 import * as aiCredits from "./aiCredits.js";
+import { mainKeyboard } from "./botText.js";
 import { config } from "./config.js";
 import { call } from "./notifyBot.js";
 
 const API = "https://openrouter.ai/api/v1";
+const GEMINI_API = "https://generativelanguage.googleapis.com/v1beta/openai";
 
-// One button per slot. `match` runs over the catalog's ids; among the
-// matches the newest (by OpenRouter's `created`) is used. `image: true`
-// means the slot draws pictures instead of answering in text; `tier` is
-// which AI Credit price it charges (aiCredits.costs()).
-// `emoji` is a token into customEmoji.js's pack (the real provider logo,
-// once /makeemoji has built it); the plain glyph in `label` is what shows
-// until then, and what stays if the owner has no Telegram Premium.
+// One button per slot. `match` runs over OpenRouter's ids; among the matches
+// the newest (by `created`) is used. `tier` is which AI Credit price it
+// charges (aiCredits.costs()); `emoji` is the provider's logo in the custom
+// emoji pack (customEmoji.js), the plain glyph in `label` standing in until
+// /makeemoji has built it. `best` is what the capability card says it's
+// strongest at.
 const SLOTS = [
-  { key: "claude", label: "🧠 Claude", tier: "premium", emoji: "ai_claude", match: (id) => /^anthropic\/claude-/.test(id) && !/haiku|:free|:thinking/.test(id) },
-  { key: "gpt", label: "⚡ ChatGPT", tier: "premium", emoji: "ai_openai", match: (id) => /^openai\/gpt-\d/.test(id) && !/mini|nano|oss|audio|image|search|codex|chat|:free/.test(id) },
-  { key: "gemini", label: "💎 Gemini Pro", tier: "premium", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-pro/.test(id) && !/image|:free/.test(id) },
-  { key: "flash", label: "🚀 Gemini Flash", tier: "cheap", emoji: "ai_gemini", match: (id) => /^google\/gemini-[\d.]+-flash/.test(id) && !/lite|image|:free/.test(id) },
-  { key: "grok", label: "🛰 Grok", tier: "premium", emoji: "ai_grok", match: (id) => /^x-ai\/grok-\d/.test(id) && !/mini|fast|code|vision|:free/.test(id) },
-  { key: "deepseek", label: "🐋 DeepSeek", tier: "cheap", emoji: "ai_deepseek", match: (id) => /^deepseek\/deepseek-/.test(id) && !/distill|coder|prover|:free/.test(id) },
-  { key: "image", label: "🎨 បង្កើតរូបភាព · Create image", tier: "image", image: true, match: (id, m) => outputs(m).includes("image") && !/:free/.test(id) },
+  {
+    key: "claude", label: "🧠 Claude", tier: "premium", emoji: "ai_claude",
+    best: { km: "សរសេរ · ភាសាខ្មែរល្អ · វិភាគវែងៗ · កូដ", en: "writing · strong Khmer · long analysis · code" },
+    match: (id) => /^anthropic\/claude-/.test(id) && !/haiku|:free|:thinking/.test(id),
+  },
+  {
+    key: "gpt", label: "⚡ ChatGPT", tier: "premium", emoji: "ai_openai",
+    best: { km: "ចំណេះដឹងទូទៅ · គណិត · ការងារប្រចាំថ្ងៃ", en: "general knowledge · maths · everyday work" },
+    match: (id) => /^openai\/gpt-\d/.test(id) && !/mini|nano|oss|audio|image|search|codex|chat|:free/.test(id),
+  },
+  {
+    key: "gemini", label: "💎 Gemini Pro", tier: "premium", emoji: "ai_gemini",
+    best: { km: "ចម្លើយលម្អិត · មើលរូប/ឯកសារ · ការគិតស៊ីជម្រៅ", en: "detailed answers · photos & documents · deep reasoning" },
+    match: (id) => /^google\/gemini-[\d.]+-pro/.test(id) && !/image|:free/.test(id),
+  },
+  {
+    key: "flash", label: "🚀 Gemini Flash", tier: "cheap", emoji: "ai_gemini",
+    best: { km: "លឿនបំផុត · ថោក · សំណួរប្រចាំថ្ងៃ", en: "fastest · cheap · everyday questions" },
+    match: (id) => /^google\/gemini-[\d.]+-flash/.test(id) && !/lite|image|:free/.test(id),
+  },
+  {
+    key: "grok", label: "🛰 Grok", tier: "premium", emoji: "ai_grok",
+    best: { km: "ឆ្លើយត្រង់ៗ · បែបសប្បាយ · គំនិតច្នៃប្រឌិត", en: "straight answers · playful · creative ideas" },
+    match: (id) => /^x-ai\/grok-\d/.test(id) && !/mini|fast|code|vision|:free/.test(id),
+  },
+  {
+    key: "deepseek", label: "🐋 DeepSeek", tier: "cheap", emoji: "ai_deepseek",
+    best: { km: "គណិត · ការគិតជាជំហាន · ថោក", en: "maths · step-by-step reasoning · cheap" },
+    match: (id) => /^deepseek\/deepseek-/.test(id) && !/distill|coder|prover|:free/.test(id),
+  },
 ];
 
+const IMAGE_SLOT = { key: "image", tier: "image", image: true, match: (id, m) => outputs(m).includes("image") && !/:free/.test(id) };
+
+const GEMINI_FREE = {
+  key: "gfree", label: "🆓 Gemini Free", tier: "free", provider: "google", emoji: "ai_gemini", vision: true,
+  best: { km: "ឥតគិតថ្លៃ · លឿន · សំណួរប្រចាំថ្ងៃ", en: "free · fast · everyday questions" },
+};
+
+// The AI keyboard's non-model buttons, both languages (a tap arrives as text).
+const BUTTONS = {
+  image: { km: "🎨 បង្កើតរូបភាព", en: "🎨 Create image", emoji: null },
+  song: { km: "🎵 បង្កើតចម្រៀង", en: "🎵 Create song", emoji: "ai_elevenlabs" },
+  new: { km: "🔄 ចាប់ផ្ដើមថ្មី", en: "🔄 New chat", emoji: null },
+  credit: { km: "💳 AI Credit", en: "💳 AI Credit", emoji: "credit" },
+  menu: { km: "⬅️ ម៉ឺនុយដើម", en: "⬅️ Main menu", emoji: null },
+};
+
+// Slash commands that jump straight to a model or mode (see BOT_COMMANDS in
+// botText.js for the list Telegram shows).
+const COMMANDS = {
+  "/gemini_free": "gfree", "/claude": "claude", "/chatgpt": "gpt", "/gpt": "gpt", "/gemini": "gemini",
+  "/flash": "flash", "/grok": "grok", "/deepseek": "deepseek", "/image": "image", "/song": "song",
+  "/ai_credit": "credit", "/newchat": "new",
+};
+
 const SYSTEM_PROMPT = [
-  "You are SaveIt AI, the assistant inside the SaveIt Telegram bot, used mostly by people in Cambodia.",
+  "You are SaveIt AI, the assistant inside the SaveIt Telegram bot, used mostly by people in Cambodia. Today is {date}.",
   "Language: reply in the language the user writes in. If they write Khmer, answer in clear, natural, correct Khmer script (not romanized). If the message is only a photo, answer in {lang}.",
-  "Style: be accurate, direct and genuinely helpful. Lead with the answer, then the detail that matters. Use short paragraphs and simple bullet lists; no tables, no Markdown headings, no **bold** -- Telegram shows plain text.",
-  "Photos: when the user sends an image, look at it carefully and do what they ask (describe it, read the text in it, solve the problem shown, translate it, etc.). If there's no caption, describe what is in it and anything useful you notice.",
-  "Honesty: if you're not sure, say so plainly instead of guessing. Never invent facts, prices, laws, phone numbers or links.",
-  "Keep answers a reasonable length for a phone screen unless the user asks for something long.",
+  "Style: accurate, direct and genuinely helpful. Lead with the answer, then the detail that matters. Short paragraphs and simple bullet lists; no tables, no Markdown headings, no **bold** -- Telegram shows plain text.",
+  "Photos: look carefully and do what they ask (describe, read the text, solve the problem shown, translate…). With no caption, describe it and anything useful you notice.",
+  "{tools}",
+  "Honesty: if you're not sure, say so plainly. Never invent facts, prices, laws, phone numbers or links.",
+  "Keep answers a phone-screen length unless asked for something long.",
 ].join("\n");
+
+const TOOLS_PROMPT =
+  "You can create pictures and songs with your tools. Call create_image when the user asks you to draw, make, generate or design a picture, photo, logo, poster or illustration. " +
+  "Call create_song when they ask you to make, compose or sing a song or music. Write the tool's argument in English with every detail they gave (keep any Khmer lyrics or text exactly as written). " +
+  "Don't call a tool for anything else, and don't ask for confirmation first unless the request is genuinely unclear.";
 
 const IMAGE_PROMPT =
   "Create the image the user describes. If the description is in Khmer, follow it faithfully. " +
   "Make it high quality and visually clear. Reply with the image and at most one short sentence.";
-
-// The song button isn't an OpenRouter model: lyrics come from the best text
-// model in the menu, the music from ElevenLabs.
-const SONG = { key: "song", label: "🎵 បង្កើតចម្រៀង · Create song", tier: "song", song: true, emoji: "ai_elevenlabs" };
 
 const LYRICS_PROMPT = [
   "You write songs for an AI singer. From the user's request, write an original song and return ONLY JSON, no other text:",
@@ -66,79 +125,112 @@ const LYRICS_PROMPT = [
   "Never copy lyrics from existing songs.",
 ].join("\n");
 
+const SEP = "━━━━━━━━━━━━━━";
+
 const TEXT = {
   km: {
-    pick:
-      "{:sparkle:} SaveIt AI\n\n" +
-      "ជ្រើសរើស Model ខាងក្រោម រួចផ្ញើ៖\n" +
-      "• អត្ថបទ — សួរអ្វីក៏បាន សរសេរ បកប្រែ ពន្យល់…\n" +
-      "• រូបភាព — (ដាក់ caption បើចង់) ឲ្យ AI មើល អាន ឬដោះស្រាយ\n" +
-      "• 🎨 បង្កើតរូបភាព — រៀបរាប់រូបដែលចង់បាន\n" +
-      "• 🎵 បង្កើតចម្រៀង — ប្រាប់ប្រធានបទ និងស្ទីលបទចម្រៀង\n\n" +
-      "ចុចប៊ូតុងម៉ឺនុយណាមួយដើម្បីចេញ។",
-    balance: (free, paid) => `\n\n{:sparkle:} Credit៖ 🎁 ${free} ឥតគិតថ្លៃថ្ងៃនេះ · 💳 ${paid}`,
-    creditButton: "💳 AI Credit · ទិញបន្ថែម",
-    chosenSong:
-      "{:ok:} បានជ្រើស 🎵 បង្កើតចម្រៀង\n\n" +
-      "ប្រាប់ប្រធានបទ អារម្មណ៍ និងស្ទីលបទ — ឧ. «ចម្រៀងស្នេហាខ្មែរ បែបរ៉ូមែនទិក យឺតៗ អំពីការនឹកផ្ទះនៅខេត្តបាត់ដំបង»។\n" +
-      "ឬបិទភ្ជាប់ទំនុកផ្ទាល់ខ្លួនរបស់អ្នក។",
+    home: (models, using, free, paid) =>
+      `{:sparkle:} SaveIt AI\n${SEP}\n` +
+      `💬 សួរអ្វីក៏បាន · សរសេរ · បកប្រែ · កូដ\n` +
+      `👁 ផ្ញើរូបមក — AI មើល អាន ដោះស្រាយ\n` +
+      `🎨 «គូររូប…» — AI បង្កើតរូបភាព\n` +
+      `🎵 «បង្កើតចម្រៀង…» — AI និពន្ធ និងច្រៀង\n` +
+      `គ្រាន់តែសរសេរមក — AI យល់ខ្លួនឯងថាត្រូវឆ្លើយ គូរ ឬច្រៀង។\n` +
+      `${SEP}\n` +
+      `📋 Model · Credit ក្នុងមួយសារ\n${models}\n` +
+      `${SEP}\n` +
+      `✅ កំពុងប្រើ៖ ${using}\n` +
+      `{:gift:} Credit៖ ${free} ឥតគិតថ្លៃថ្ងៃនេះ · 💳 ${paid}\n` +
+      `{:bulb:} ប្ដូរ Model ប្រើប៊ូតុងខាងក្រោម · ចុច ⬅️ ម៉ឺនុយដើម ដើម្បីចេញ`,
+    freeLine: (n) => `${n} សារ/ថ្ងៃ`,
+    card: (label, price, lines, best) =>
+      `{:ok:} ${label} · ${price}\n${SEP}\n${lines}\n⭐ ពូកែ៖ ${best}\n${SEP}\nសរសេរ ឬផ្ញើរូបមកបានហើយ។`,
+    capChat: "✅ សួរ-ឆ្លើយ · សរសេរ · បកប្រែ · កូដ",
+    capVision: "✅ មើលរូប — ផ្ញើរូបមក (ដាក់ caption បើចង់)",
+    capNoVision: "➖ មើលរូបមិនបាន — ប្ដូរទៅ Model ផ្សេងដើម្បីផ្ញើរូប",
+    capImage: (c) => `✅ គូររូប — សរសេរ «គូររូប…» (+${c} Credit)`,
+    capSong: (c) => `✅ បង្កើតចម្រៀង — សរសេរ «បង្កើតចម្រៀង…» (+${c} Credit)`,
+    perMsg: (c) => (c ? `${c} Credit/សារ` : "ឥតគិតថ្លៃ"),
+    chosenImage: (c) =>
+      `{:ok:} 🎨 បង្កើតរូបភាព · ${c} Credit\n\nរៀបរាប់រូបភាពដែលចង់បាន (ឧ. «ឆ្មាពាក់មួកអង្គុយលើប្រាសាទអង្គរវត្ត ពេលថ្ងៃលិច»)។`,
+    chosenSong: (c) =>
+      `{:ok:} 🎵 បង្កើតចម្រៀង · ${c} Credit\n\n` +
+      "ប្រាប់ប្រធានបទ អារម្មណ៍ និងស្ទីលបទ — ឧ. «ចម្រៀងស្នេហាខ្មែរ បែបរ៉ូមែនទិក យឺតៗ អំពីការនឹកផ្ទះនៅខេត្តបាត់ដំបង»។\nឬបិទភ្ជាប់ទំនុកផ្ទាល់ខ្លួនរបស់អ្នក។",
     writing: "{:wait:} កំពុងនិពន្ធទំនុក…",
     singing: "{:wait:} កំពុងផលិតបទចម្រៀង… (អាចចំណាយពេល ១–៣ នាទី)",
     songFailed: "{:fail:} បង្កើតចម្រៀងមិនបានទេ។ Credit ត្រូវបានបង្វិលសងវិញ។ សូមសាកម្ដងទៀត។",
     songTextOnly: "{:fail:} សូមសរសេរពីបទចម្រៀងដែលចង់បាន (មិនមែនរូបភាព)។",
+    songOff: "{:fail:} មុខងារបង្កើតចម្រៀងមិនទាន់បើកទេ។",
+    imageOff: "{:fail:} មុខងារបង្កើតរូបភាពមិនទាន់បើកទេ។",
     noCredit: (need, free, paid) =>
-      `{:fail:} Credit មិនគ្រប់ទេ — ត្រូវការ ${need} Credit (អ្នកមាន 🎁 ${free} + 💳 ${paid})។\n\nទិញ AI Credit បន្ថែម ឬសាក Model ថោកជាង (🚀 Gemini Flash · 🐋 DeepSeek)។`,
-    chosen: (label) => `{:ok:} បានជ្រើស ${label}\n\nផ្ញើអត្ថបទ ឬរូបភាពមកបានហើយ។`,
-    chosenImage: "{:ok:} បានជ្រើស 🎨 បង្កើតរូបភាព\n\nរៀបរាប់រូបភាពដែលចង់បាន (ឧ. «ឆ្មាពាក់មួកអង្គុយលើប្រាសាទអង្គរវត្ត ពេលថ្ងៃលិច»)។",
+      `{:fail:} Credit មិនគ្រប់ទេ — ត្រូវការ ${need} Credit (អ្នកមាន 🎁 ${free} + 💳 ${paid})។\n\nទិញ AI Credit បន្ថែម ឬប្ដូរទៅ 🆓 Gemini Free / Model ថោកជាង។`,
+    freeLimit: (n) => `{:fail:} 🆓 Gemini Free អស់ ${n} សារសម្រាប់ថ្ងៃនេះហើយ។ សាក Model ផ្សេង ឬត្រឡប់មកថ្ងៃស្អែក។`,
+    freeBusy: "{:fail:} 🆓 Gemini Free ពេញកម្រិតរបស់ Google បណ្ដោះអាសន្ន។ រង់ចាំមួយភ្លែត ឬសាក Model ផ្សេង។",
     thinking: "{:wait:} AI កំពុងគិត…",
     drawing: "{:wait:} កំពុងបង្កើតរូបភាព…",
-    failed: "{:fail:} AI ឆ្លើយមិនបានទេ សូមសាកម្ដងទៀត ឬជ្រើស Model ផ្សេង។",
-    noImage: "{:fail:} Model នេះមិនបានបង្កើតរូបភាពទេ សូមសាករៀបរាប់ម្ដងទៀត។",
+    failed: "{:fail:} AI ឆ្លើយមិនបានទេ សូមសាកម្ដងទៀត ឬប្ដូរ Model។",
+    noImage: "{:fail:} មិនបានបង្កើតរូបភាពទេ សូមសាករៀបរាប់ម្ដងទៀត។ Credit បានបង្វិលសងវិញ។",
     off: "{:fail:} AI មិនទាន់បើកនៅឡើយទេ។",
-    newChat: "🔄 ចាប់ផ្ដើមថ្មី",
-    changeModel: "🔁 ប្ដូរ Model",
     cleared: "{:ok:} បានចាប់ផ្ដើមការសន្ទនាថ្មី។",
     noModels: "{:fail:} រក Model មិនឃើញទេ សូមសាកម្ដងទៀតបន្តិចទៀត។",
-    noVision: "{:fail:} Model នេះមើលរូបភាពមិនបានទេ សូមជ្រើស Claude, ChatGPT ឬ Gemini។",
+    noVision: "{:fail:} Model នេះមើលរូបភាពមិនបានទេ — ប្ដូរទៅ 🆓 Gemini Free, Claude, ChatGPT ឬ Gemini។",
+    back: "{:ok:} ត្រឡប់មកម៉ឺនុយដើម។",
   },
   en: {
-    pick:
-      "{:sparkle:} SaveIt AI\n\n" +
-      "Pick a model below, then send:\n" +
-      "• Text — ask anything, write, translate, explain…\n" +
-      "• A photo — (add a caption if you like) for the AI to look at, read or solve\n" +
-      "• 🎨 Create image — describe the picture you want\n" +
-      "• 🎵 Create song — tell it the topic and style\n\n" +
-      "Tap any menu button to leave.",
-    balance: (free, paid) => `\n\n{:sparkle:} Credit: 🎁 ${free} free today · 💳 ${paid}`,
-    creditButton: "💳 AI Credit · Buy more",
-    chosenSong:
-      "{:ok:} 🎵 Create song selected\n\n" +
-      "Tell me the topic, mood and style — e.g. \"a slow romantic Khmer love song about missing home in Battambang\".\n" +
-      "Or paste your own lyrics.",
+    home: (models, using, free, paid) =>
+      `{:sparkle:} SaveIt AI\n${SEP}\n` +
+      `💬 Ask anything · write · translate · code\n` +
+      `👁 Send a photo — the AI looks, reads, solves\n` +
+      `🎨 "Draw…" — the AI makes a picture\n` +
+      `🎵 "Make a song…" — the AI writes and sings it\n` +
+      `Just write — the AI works out whether to answer, draw or sing.\n` +
+      `${SEP}\n` +
+      `📋 Model · Credit per message\n${models}\n` +
+      `${SEP}\n` +
+      `✅ Using: ${using}\n` +
+      `{:gift:} Credit: ${free} free today · 💳 ${paid}\n` +
+      `{:bulb:} Switch model with the buttons below · ⬅️ Main menu to leave`,
+    freeLine: (n) => `${n} messages/day`,
+    card: (label, price, lines, best) =>
+      `{:ok:} ${label} · ${price}\n${SEP}\n${lines}\n⭐ Best at: ${best}\n${SEP}\nWrite, or send a photo.`,
+    capChat: "✅ Questions · writing · translation · code",
+    capVision: "✅ Sees photos — send one (caption optional)",
+    capNoVision: "➖ Can't see photos — switch model to send one",
+    capImage: (c) => `✅ Draws — write "draw…" (+${c} Credit)`,
+    capSong: (c) => `✅ Makes songs — write "make a song…" (+${c} Credit)`,
+    perMsg: (c) => (c ? `${c} Credit/message` : "free"),
+    chosenImage: (c) => `{:ok:} 🎨 Create image · ${c} Credit\n\nDescribe the picture you want (e.g. "a cat in a hat on Angkor Wat at sunset").`,
+    chosenSong: (c) =>
+      `{:ok:} 🎵 Create song · ${c} Credit\n\n` +
+      'Tell me the topic, mood and style — e.g. "a slow romantic Khmer love song about missing home in Battambang".\nOr paste your own lyrics.',
     writing: "{:wait:} Writing the lyrics…",
     singing: "{:wait:} Producing the song… (can take 1–3 minutes)",
     songFailed: "{:fail:} Couldn't create the song. Your Credit was refunded. Please try again.",
     songTextOnly: "{:fail:} Please describe the song you want in text (not a photo).",
+    songOff: "{:fail:} Song creation isn't switched on yet.",
+    imageOff: "{:fail:} Image creation isn't switched on yet.",
     noCredit: (need, free, paid) =>
-      `{:fail:} Not enough Credit — this needs ${need} (you have 🎁 ${free} + 💳 ${paid}).\n\nBuy more AI Credit, or try a cheaper model (🚀 Gemini Flash · 🐋 DeepSeek).`,
-    chosen: (label) => `{:ok:} ${label} selected\n\nSend your text or photo.`,
-    chosenImage: "{:ok:} 🎨 Create image selected\n\nDescribe the picture you want (e.g. \"a cat in a hat sitting on Angkor Wat at sunset\").",
+      `{:fail:} Not enough Credit — this needs ${need} (you have 🎁 ${free} + 💳 ${paid}).\n\nBuy more AI Credit, or switch to 🆓 Gemini Free / a cheaper model.`,
+    freeLimit: (n) => `{:fail:} You've used today's ${n} 🆓 Gemini Free messages. Try another model, or come back tomorrow.`,
+    freeBusy: "{:fail:} 🆓 Gemini Free has hit Google's limit for now. Wait a moment, or try another model.",
     thinking: "{:wait:} Thinking…",
     drawing: "{:wait:} Creating the image…",
-    failed: "{:fail:} The AI couldn't answer. Please try again or pick another model.",
-    noImage: "{:fail:} The model didn't return an image. Please try describing it again.",
+    failed: "{:fail:} The AI couldn't answer. Please try again or switch model.",
+    noImage: "{:fail:} No image came back. Please try describing it again. Your Credit was refunded.",
     off: "{:fail:} AI isn't switched on yet.",
-    newChat: "🔄 New chat",
-    changeModel: "🔁 Change model",
     cleared: "{:ok:} Started a new conversation.",
     noModels: "{:fail:} Couldn't load the models. Please try again in a moment.",
-    noVision: "{:fail:} This model can't see photos. Please pick Claude, ChatGPT or Gemini.",
+    noVision: "{:fail:} This model can't see photos — switch to 🆓 Gemini Free, Claude, ChatGPT or Gemini.",
+    back: "{:ok:} Back to the main menu.",
   },
 };
 
 const outputs = (m) => m?.architecture?.output_modalities ?? [];
 const inputs = (m) => m?.architecture?.input_modalities ?? [];
+const t = (user) => TEXT[user?.language] ?? TEXT.km;
+const lang = (user) => (user?.language === "en" ? "en" : "km");
+const isAdmin = (chatId) => Boolean(config.telegramAdminChatId) && String(chatId) === String(config.telegramAdminChatId);
+const aiOn = () => Boolean(config.openrouterApiKey || config.geminiApiKey);
 
 // --------------------------------------------------------------- catalog
 
@@ -147,6 +239,7 @@ let catalogAt = 0;
 const CATALOG_TTL_MS = 6 * 60 * 60_000;
 
 async function fetchCatalog() {
+  if (!config.openrouterApiKey) return [];
   if (catalog && Date.now() - catalogAt < CATALOG_TTL_MS) return catalog;
   const res = await fetch(`${API}/models`);
   if (!res.ok) throw new Error(`OpenRouter /models returned ${res.status}`);
@@ -155,34 +248,77 @@ async function fetchCatalog() {
   return catalog;
 }
 
-/** The model menu: [{ key, label, id, image, vision }]. */
+let geminiModel = null;
+let geminiModelAt = 0;
+
+/** Google's newest stable Flash (or GEMINI_FREE_MODEL), for 🆓 Gemini Free. */
+async function geminiFreeModel() {
+  if (config.geminiFreeModel) return config.geminiFreeModel;
+  if (geminiModel && Date.now() - geminiModelAt < CATALOG_TTL_MS) return geminiModel;
+  try {
+    const res = await fetch(`${GEMINI_API}/models`, { headers: { authorization: `Bearer ${config.geminiApiKey}` } });
+    const ids = ((await res.json())?.data ?? []).map((m) => String(m.id).replace(/^models\//, ""));
+    const version = (id) => Number(/^gemini-(\d+(?:\.\d+)?)/.exec(id)?.[1] ?? 0);
+    const flash = ids
+      .filter((id) => /^gemini-[\d.]+-flash/.test(id) && !/lite|image|tts|live|audio|exp|thinking|native/.test(id))
+      .sort((a, b) => version(b) - version(a) || Number(/preview/.test(a)) - Number(/preview/.test(b)));
+    if (flash[0]) {
+      geminiModel = flash[0];
+      geminiModelAt = Date.now();
+    }
+  } catch (err) {
+    console.error("Gemini model list failed:", err?.message ?? err);
+  }
+  return geminiModel ?? "gemini-2.5-flash";
+}
+
+/**
+ * The menu: the chat models in button order, then the image model (if any)
+ * and the song "model" (if ElevenLabs is set). Each entry: { key, label, id,
+ * tier, emoji, vision, provider, image?, song?, best? }.
+ */
 export async function models() {
-  const all = await fetchCatalog();
+  const menu = [];
+  if (config.geminiApiKey) menu.push({ ...GEMINI_FREE, id: await geminiFreeModel() });
+
+  const all = await fetchCatalog().catch((err) => {
+    console.error("OpenRouter catalog failed:", err?.message ?? err);
+    return [];
+  });
   const byId = new Map(all.map((m) => [m.id, m]));
+  const newestFirst = [...all].sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
+
   if (config.aiModels.length) {
-    const menu = config.aiModels.map(({ id, label }, i) => {
+    config.aiModels.forEach(({ id, label }, i) => {
       const m = byId.get(id);
       const image = outputs(m).includes("image");
       const tier = image ? "image" : /flash|mini|nano|lite|deepseek|haiku/i.test(id) ? "cheap" : "premium";
-      return { key: `c${i}`, label, id, image, tier, vision: inputs(m).includes("image") };
+      menu.push({ key: `c${i}`, label, id, image, tier, vision: inputs(m).includes("image") });
     });
-    return config.elevenlabsApiKey ? [...menu, SONG] : menu;
+  } else {
+    for (const slot of SLOTS) {
+      const m = newestFirst.find((x) => slot.match(x.id, x) && outputs(x).includes("text"));
+      if (m) menu.push({ ...slot, match: undefined, id: m.id, vision: inputs(m).includes("image") });
+    }
+    const img = newestFirst.find((x) => IMAGE_SLOT.match(x.id, x));
+    if (img) menu.push({ key: "image", label: BUTTONS.image.km, tier: "image", image: true, id: img.id, vision: true });
   }
-  const newestFirst = [...all].sort((a, b) => (b.created ?? 0) - (a.created ?? 0));
-  const menu = [];
-  for (const slot of SLOTS) {
-    const m = newestFirst.find((x) => slot.match(x.id, x) && (slot.image || outputs(x).includes("text")));
-    if (m) menu.push({ key: slot.key, label: slot.label, id: m.id, tier: slot.tier, emoji: slot.emoji, image: Boolean(slot.image), vision: inputs(m).includes("image") });
-  }
-  if (config.elevenlabsApiKey) menu.push(SONG);
+  if (config.elevenlabsApiKey) menu.push({ key: "song", label: BUTTONS.song.km, tier: "song", song: true, emoji: BUTTONS.song.emoji });
   return menu;
 }
+
+const chatModels = (menu) => menu.filter((m) => !m.image && !m.song);
+const imageModel = (menu) => menu.find((m) => m.image);
 
 // ----------------------------------------------------------------- state
 
 const sessions = new Map(); // chatId -> { model, history: [{role, content}], at }
-const SESSION_MS = 30 * 60_000;
+// Long, because the AI keyboard stays on screen: someone coming back hours
+// later should still be talking to the AI, not get "that isn't a link".
+const SESSION_MS = 12 * 60 * 60_000;
 const MAX_TURNS = 8;
+const freeUses = new Map(); // userId -> { day, count } for 🆓 Gemini Free
+const noTools = new Set(); // model ids that refused the tools parameter
 
 function session(chatId) {
   const s = sessions.get(chatId);
@@ -194,7 +330,7 @@ function session(chatId) {
   return s;
 }
 
-/** Whether a model is chosen and waiting for this chat's next message. */
+/** Whether this chat is in the AI (its next message goes to the model). */
 export function isActive(chatId) {
   return Boolean(session(chatId));
 }
@@ -203,210 +339,459 @@ export function cancel(chatId) {
   sessions.delete(chatId);
 }
 
-// ------------------------------------------------------------------- flow
-
-const t = (user) => TEXT[user?.language] ?? TEXT.km;
-
-/** "🤖 AI" tapped: the model picker. */
-export async function ask(chatId, user) {
-  const tx = t(user);
-  if (!config.openrouterApiKey) return call("sendMessage", { chat_id: chatId, text: tx.off });
-  let menu;
-  try {
-    menu = await models();
-  } catch (err) {
-    console.error("AI models failed:", err?.message ?? err);
-    return call("sendMessage", { chat_id: chatId, text: tx.noModels });
-  }
-  if (!menu.length) return call("sendMessage", { chat_id: chatId, text: tx.noModels });
-  const c = await aiCredits.costs();
-  const button = (m) => ({ text: `${m.label} · ${c[m.tier] ?? 0}`, ...(m.emoji ? { emoji: m.emoji } : {}), callback_data: `ai:m:${m.key}` });
-  const rows = [];
-  const textModels = menu.filter((m) => !m.image && !m.song);
-  for (let i = 0; i < textModels.length; i += 2) rows.push(textModels.slice(i, i + 2).map(button));
-  for (const m of menu.filter((x) => x.image || x.song)) rows.push([button(m)]);
-  rows.push([{ text: tx.creditButton, style: "success", callback_data: "ai:credit" }]);
-  const { free, paid } = await aiCredits.balance(user.telegram_user_id).catch(() => ({ free: "?", paid: "?" }));
-  return call("sendMessage", { chat_id: chatId, text: tx.pick + tx.balance(free, paid), reply_markup: { inline_keyboard: rows } });
+/** One 🆓 Gemini Free message; false once today's per-person cap is used. */
+function takeFree(chatId, userId) {
+  if (isAdmin(chatId) || !config.aiGeminiFreeDaily) return true;
+  const day = new Date().toISOString().slice(0, 10);
+  const u = freeUses.get(userId);
+  const count = u?.day === day ? u.count : 0;
+  if (count >= config.aiGeminiFreeDaily) return false;
+  freeUses.set(userId, { day, count: count + 1 });
+  return true;
 }
 
-const sessionKeyboard = (tx) => ({
-  inline_keyboard: [
-    [
-      { text: tx.newChat, callback_data: "ai:new" },
-      { text: tx.changeModel, callback_data: "ai:pick" },
-    ],
-  ],
-});
+function giveBackFree(userId) {
+  const u = freeUses.get(userId);
+  if (u?.count) u.count -= 1;
+}
 
-const creditKeyboard = (tx) => ({
-  inline_keyboard: [
-    [{ text: tx.creditButton, style: "success", callback_data: "ai:credit" }],
-    [{ text: tx.changeModel, callback_data: "ai:pick" }],
-  ],
-});
+// ------------------------------------------------------------- keyboards
 
-/** Taps on the picker / session buttons (callback data "ai:..."). */
-export async function handleCallback(cq, user) {
-  const chatId = cq.message?.chat?.id;
+/** The AI's own keyboard (replaces the main menu while in the AI). */
+function aiKeyboard(menu, user) {
+  const l = lang(user);
+  const btn = (text, emoji) => ({ text, ...(emoji ? { emoji } : {}) });
+  const chats = chatModels(menu).map((m) => btn(m.label, m.emoji));
+  const rows = [];
+  // 🆓 Gemini Free gets a row of its own at the top: the one anyone can use.
+  if (chats[0] && menu[0]?.key === "gfree") rows.push([chats.shift()]);
+  for (let i = 0; i < chats.length; i += 2) rows.push(chats.slice(i, i + 2));
+  const tools = [];
+  if (imageModel(menu)) tools.push(btn(BUTTONS.image[l], BUTTONS.image.emoji));
+  if (menu.some((m) => m.song)) tools.push(btn(BUTTONS.song[l], BUTTONS.song.emoji));
+  if (tools.length) rows.push(tools);
+  rows.push([btn(BUTTONS.new[l]), btn(BUTTONS.credit[l], BUTTONS.credit.emoji)]);
+  rows.push([btn(BUTTONS.menu[l])]);
+  return { keyboard: rows, resize_keyboard: true, is_persistent: true };
+}
+
+// A tap on the AI keyboard arrives as its label -- or, once a logo icon
+// replaced the label's leading emoji, as the label without it.
+const bare = (label) => String(label ?? "").trim().replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, "");
+
+function buttonFor(text, menu) {
+  const said = String(text ?? "").trim();
+  if (!said) return null;
+  for (const m of chatModels(menu)) if (said === m.label || said === bare(m.label)) return m.key;
+  for (const [key, b] of Object.entries(BUTTONS)) {
+    if ([b.km, b.en].some((label) => said === label || said === bare(label))) return key;
+  }
+  return null;
+}
+
+// --------------------------------------------------------------- screens
+
+async function priceList(menu, c, user) {
   const tx = t(user);
-  const [, kind, key] = String(cq.data).split(":");
-  await call("answerCallbackQuery", { callback_query_id: cq.id });
-  if (!chatId) return true;
+  const price = (m) => (m.tier === "free" ? `${tx.perMsg(0)} (${tx.freeLine(config.aiGeminiFreeDaily)})` : `${c[m.tier] ?? 0}`);
+  const logo = (m) => (m.emoji ? `{:${m.emoji}:}` : m.label.split(" ")[0]);
+  const name = (m) => m.label.replace(/^\S+\s/, "");
+  const lines = chatModels(menu).map((m) => `${logo(m)} ${name(m)} — ${price(m)}`);
+  const extras = [];
+  if (imageModel(menu)) extras.push(`🎨 ${bare(BUTTONS.image[lang(user)])} — ${c.image}`);
+  if (menu.some((m) => m.song)) extras.push(`{:ai_elevenlabs:} ${bare(BUTTONS.song[lang(user)])} — ${c.song}`);
+  if (extras.length) lines.push(extras.join(" · "));
+  return lines.join("\n");
+}
 
-  if (kind === "pick") {
-    await ask(chatId, user);
+/** What one chat model can do, shown when it's picked. */
+async function capabilityCard(model, menu, user) {
+  const tx = t(user);
+  const c = await aiCredits.costs();
+  const price = model.tier === "free" ? `${tx.perMsg(0)} · ${tx.freeLine(config.aiGeminiFreeDaily)}` : tx.perMsg(c[model.tier] ?? 0);
+  const lines = [tx.capChat, model.vision ? tx.capVision : tx.capNoVision];
+  if (imageModel(menu)) lines.push(tx.capImage(c.image));
+  if (menu.some((m) => m.song)) lines.push(tx.capSong(c.song));
+  const best = model.best?.[lang(user)] ?? model.best?.km ?? "—";
+  return tx.card(model.label, price, lines.join("\n"), best);
+}
+
+async function loadMenu(chatId, user) {
+  try {
+    const menu = await models();
+    if (chatModels(menu).length) return menu;
+  } catch (err) {
+    console.error("AI models failed:", err?.message ?? err);
+  }
+  await call("sendMessage", { chat_id: chatId, text: t(user).noModels });
+  return null;
+}
+
+/** "🤖 SaveIt AI" / /ai: into the AI, on the free (or cheapest) model. */
+export async function ask(chatId, user) {
+  const tx = t(user);
+  if (!aiOn()) return call("sendMessage", { chat_id: chatId, text: tx.off });
+  const menu = await loadMenu(chatId, user);
+  if (!menu) return null;
+  const current = session(chatId)?.model;
+  const keep = current && !current.image && !current.song && chatModels(menu).find((m) => m.key === current.key);
+  const model = keep ?? chatModels(menu).find((m) => m.tier === "free") ?? chatModels(menu).find((m) => m.tier === "cheap") ?? chatModels(menu)[0];
+  if (!keep) sessions.set(chatId, { model, history: [], at: Date.now() });
+  const c = await aiCredits.costs();
+  const { free, paid } = await aiCredits.balance(user.telegram_user_id).catch(() => ({ free: "?", paid: "?" }));
+  return call("sendMessage", {
+    chat_id: chatId,
+    text: tx.home(await priceList(menu, c, user), model.label, free, paid),
+    reply_markup: aiKeyboard(menu, user),
+  });
+}
+
+async function switchTo(chatId, user, key, menu) {
+  const tx = t(user);
+  const c = await aiCredits.costs();
+  if (key === "image") {
+    const model = imageModel(menu);
+    if (!model) return call("sendMessage", { chat_id: chatId, text: tx.imageOff });
+    sessions.set(chatId, { model, history: [], at: Date.now() });
+    return call("sendMessage", { chat_id: chatId, text: tx.chosenImage(c.image), reply_markup: aiKeyboard(menu, user) });
+  }
+  if (key === "song") {
+    const model = menu.find((m) => m.song);
+    if (!model) return call("sendMessage", { chat_id: chatId, text: tx.songOff });
+    sessions.set(chatId, { model, history: [], at: Date.now() });
+    return call("sendMessage", { chat_id: chatId, text: tx.chosenSong(c.song), reply_markup: aiKeyboard(menu, user) });
+  }
+  const model = chatModels(menu).find((m) => m.key === key);
+  if (!model) return call("sendMessage", { chat_id: chatId, text: tx.noModels });
+  // Switching model keeps the conversation going, the way an AI app does.
+  const history = session(chatId)?.history ?? [];
+  sessions.set(chatId, { model, history, at: Date.now() });
+  return call("sendMessage", { chat_id: chatId, text: await capabilityCard(model, menu, user), reply_markup: aiKeyboard(menu, user) });
+}
+
+/**
+ * A tap on the AI keyboard, or one of the AI's slash commands (/claude,
+ * /image, …). Returns true when it was one.
+ */
+export async function handleButton(chatId, user, text) {
+  const cmd = COMMANDS[String(text ?? "").trim().split(/\s+/)[0].toLowerCase().replace(/@\w+$/, "")];
+  const quick = cmd ?? (Object.values(BUTTONS).some((b) => [b.km, b.en].some((l) => text === l || text === bare(l))) ? "button" : null);
+  // Model labels only count while the AI keyboard could be on screen.
+  if (!quick && !isActive(chatId) && !/^\S*\s?(Claude|ChatGPT|Gemini|Grok|DeepSeek)\b/.test(bare(text))) return false;
+
+  const tx = t(user);
+  if (!aiOn()) {
+    if (!quick) return false;
+    await call("sendMessage", { chat_id: chatId, text: tx.off });
     return true;
   }
-  if (kind === "credit") {
+  const menu = await models().catch(() => []);
+  const key = cmd ?? buttonFor(text, menu);
+  if (!key) return false;
+
+  if (key === "menu") {
+    cancel(chatId);
+    await call("sendMessage", { chat_id: chatId, text: tx.back, reply_markup: mainKeyboard(user.language) });
+    return true;
+  }
+  if (key === "credit") {
     await aiCredits.showTopUps(chatId, user).catch((err) => console.error("AI Credit screen failed:", err?.message ?? err));
     return true;
   }
-  if (kind === "new") {
+  if (key === "new") {
     const s = session(chatId);
     if (s) {
       s.history = [];
       s.at = Date.now();
+      await call("sendMessage", { chat_id: chatId, text: tx.cleared });
+    } else {
+      await ask(chatId, user);
     }
-    await call("sendMessage", { chat_id: chatId, text: tx.cleared });
     return true;
   }
-  if (kind === "m") {
-    const model = (await models().catch(() => [])).find((m) => m.key === key);
-    if (!model) {
-      await call("sendMessage", { chat_id: chatId, text: tx.noModels });
-      return true;
-    }
-    sessions.set(chatId, { model, history: [], at: Date.now() });
-    const text = model.song ? tx.chosenSong : model.image ? tx.chosenImage : tx.chosen(model.label);
-    await call("sendMessage", { chat_id: chatId, text });
-    return true;
+  await switchTo(chatId, user, key, menu);
+  return true;
+}
+
+/** Taps on inline buttons from older AI screens (callback data "ai:..."). */
+export async function handleCallback(cq, user) {
+  const chatId = cq.message?.chat?.id;
+  const [, kind, key] = String(cq.data).split(":");
+  await call("answerCallbackQuery", { callback_query_id: cq.id });
+  if (!chatId) return true;
+  if (kind === "credit") {
+    await aiCredits.showTopUps(chatId, user).catch((err) => console.error("AI Credit screen failed:", err?.message ?? err));
+  } else if (kind === "m" && key) {
+    const menu = await models().catch(() => []);
+    await switchTo(chatId, user, key, menu);
+  } else if (kind === "new") {
+    await handleButton(chatId, user, "/newchat");
+  } else {
+    await ask(chatId, user);
   }
   return true;
 }
 
+// ------------------------------------------------------------- messages
+
+/** Charges `cost`; when there isn't enough, says so and returns null. */
+async function pay(chatId, user, cost) {
+  const tx = t(user);
+  let receipt;
+  try {
+    receipt = await aiCredits.charge(chatId, user.telegram_user_id, cost);
+  } catch (err) {
+    console.error("AI Credit charge failed:", err?.message ?? err);
+    await call("sendMessage", { chat_id: chatId, text: tx.failed });
+    return null;
+  }
+  if (!receipt) {
+    const { free, paid } = await aiCredits.balance(user.telegram_user_id);
+    await call("sendMessage", {
+      chat_id: chatId,
+      text: tx.noCredit(cost, free, paid),
+      reply_markup: { inline_keyboard: [[{ text: BUTTONS.credit[lang(user)], style: "success", callback_data: "ai:credit" }]] },
+    });
+    return null;
+  }
+  return () => aiCredits.refund(user.telegram_user_id, receipt).catch((err) => console.error("AI Credit refund failed:", err?.message ?? err));
+}
+
+async function waiting(chatId, text, action) {
+  await call("sendChatAction", { chat_id: chatId, action }).catch(() => {});
+  const msg = await call("sendMessage", { chat_id: chatId, text });
+  const id = msg?.result?.message_id;
+  return () => (id ? call("deleteMessage", { chat_id: chatId, message_id: id }).catch(() => {}) : null);
+}
+
+/** 🎨: charge, draw with the image model, send, refund on failure. */
+async function runImage(chatId, user, prompt, photo, menu) {
+  const tx = t(user);
+  const model = imageModel(menu);
+  if (!model) {
+    await call("sendMessage", { chat_id: chatId, text: tx.imageOff });
+    return;
+  }
+  const refund = await pay(chatId, user, (await aiCredits.costs()).image);
+  if (!refund) return;
+  const done = await waiting(chatId, tx.drawing, "upload_photo");
+  try {
+    const content = [{ type: "text", text: prompt }];
+    if (photo) content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${photo.toString("base64")}` } });
+    const { text: caption, images } = await complete(model, [{ role: "system", content: IMAGE_PROMPT }, { role: "user", content }], { wantImage: true });
+    await done();
+    if (!images.length) {
+      await refund();
+      await call("sendMessage", { chat_id: chatId, text: tx.noImage });
+      return;
+    }
+    for (const url of images) await sendDataImage(chatId, url, caption.slice(0, 1000));
+  } catch (err) {
+    console.error(`AI image (${model.id}) failed:`, err?.message ?? err);
+    await done();
+    await refund();
+    await call("sendMessage", { chat_id: chatId, text: tx.noImage });
+  }
+}
+
+/** 🎵: charge, write and sing, refund on failure. */
+async function runSong(chatId, user, request, menu) {
+  const tx = t(user);
+  if (!menu.some((m) => m.song)) {
+    await call("sendMessage", { chat_id: chatId, text: tx.songOff });
+    return;
+  }
+  const refund = await pay(chatId, user, (await aiCredits.costs()).song);
+  if (!refund) return;
+  try {
+    await makeSong(chatId, request, tx, menu);
+  } catch (err) {
+    console.error("AI song failed:", err?.message ?? err);
+    await refund();
+    await call("sendMessage", { chat_id: chatId, text: tx.songFailed });
+  }
+}
+
+const TOOL_DEFS = (menu) => {
+  const defs = [];
+  if (imageModel(menu)) {
+    defs.push({
+      type: "function",
+      function: {
+        name: "create_image",
+        description: "Draw a picture for the user: photo, illustration, logo, poster, etc.",
+        parameters: {
+          type: "object",
+          properties: { prompt: { type: "string", description: "Detailed description of the picture, in English, keeping any text to show exactly." } },
+          required: ["prompt"],
+        },
+      },
+    });
+  }
+  if (menu.some((m) => m.song)) {
+    defs.push({
+      type: "function",
+      function: {
+        name: "create_song",
+        description: "Compose and sing an original song for the user.",
+        parameters: {
+          type: "object",
+          properties: { request: { type: "string", description: "Topic, mood, genre, language, and any lyrics the user gave (kept exactly)." } },
+          required: ["request"],
+        },
+      },
+    });
+  }
+  return defs;
+};
+
 /**
- * A message while a model is chosen. `photo` is the image's bytes when the
- * message carried one. Returns true when it handled the message.
+ * A message while in the AI. `photo` is the image's bytes when the message
+ * carried one. Returns true when it handled the message.
  */
 export async function handleMessage(chatId, user, text, photo) {
   const s = session(chatId);
   if (!s || (!text && !photo)) return false;
   const tx = t(user);
   s.at = Date.now();
-
-  if (s.model.song && !text) {
-    await call("sendMessage", { chat_id: chatId, text: tx.songTextOnly });
-    return true;
-  }
-  if (photo && !s.model.image && !s.model.song && !s.model.vision) {
-    await call("sendMessage", { chat_id: chatId, text: tx.noVision, reply_markup: sessionKeyboard(tx) });
-    return true;
-  }
-
-  const userId = user.telegram_user_id;
-  const cost = (await aiCredits.costs())[s.model.tier] ?? 0;
-  let receipt;
-  try {
-    receipt = await aiCredits.charge(chatId, userId, cost);
-  } catch (err) {
-    console.error("AI Credit charge failed:", err?.message ?? err);
-    await call("sendMessage", { chat_id: chatId, text: tx.failed });
-    return true;
-  }
-  if (!receipt) {
-    const { free, paid } = await aiCredits.balance(userId);
-    await call("sendMessage", { chat_id: chatId, text: tx.noCredit(cost, free, paid), reply_markup: creditKeyboard(tx) });
-    return true;
-  }
-  const refund = () => aiCredits.refund(userId, receipt).catch((err) => console.error("AI Credit refund failed:", err?.message ?? err));
+  const menu = await models().catch(() => []);
 
   if (s.model.song) {
-    try {
-      await makeSong(chatId, user, text, tx);
-    } catch (err) {
-      console.error("AI song failed:", err?.message ?? err);
-      await refund();
-      await call("sendMessage", { chat_id: chatId, text: tx.songFailed });
-    }
+    if (!text) await call("sendMessage", { chat_id: chatId, text: tx.songTextOnly });
+    else await runSong(chatId, user, text, menu);
+    return true;
+  }
+  if (s.model.image) {
+    await runImage(chatId, user, text || "Recreate this picture in high quality.", photo, menu);
+    return true;
+  }
+  if (photo && !s.model.vision) {
+    await call("sendMessage", { chat_id: chatId, text: tx.noVision });
     return true;
   }
 
-  await call("sendChatAction", { chat_id: chatId, action: s.model.image ? "upload_photo" : "typing" }).catch(() => {});
-  const waitMsg = await call("sendMessage", { chat_id: chatId, text: s.model.image ? tx.drawing : tx.thinking });
-  const dropWait = () =>
-    waitMsg?.result?.message_id
-      ? call("deleteMessage", { chat_id: chatId, message_id: waitMsg.result.message_id }).catch(() => {})
-      : null;
+  // The chat itself: free (within the daily cap) or charged by tier.
+  const userId = user.telegram_user_id;
+  let refund;
+  if (s.model.tier === "free") {
+    if (!takeFree(chatId, userId)) {
+      await call("sendMessage", { chat_id: chatId, text: tx.freeLimit(config.aiGeminiFreeDaily) });
+      return true;
+    }
+    refund = async () => giveBackFree(userId);
+  } else {
+    refund = await pay(chatId, user, (await aiCredits.costs())[s.model.tier] ?? 0);
+    if (!refund) return true;
+  }
 
+  const done = await waiting(chatId, tx.thinking, "typing");
   const content = [];
   if (text) content.push({ type: "text", text });
   if (photo) content.push({ type: "image_url", image_url: { url: `data:image/jpeg;base64,${photo.toString("base64")}` } });
-  const userTurn = { role: "user", content };
+  const tools = TOOL_DEFS(menu);
+  const system = SYSTEM_PROMPT.replace("{date}", new Date().toISOString().slice(0, 10))
+    .replace("{lang}", lang(user) === "en" ? "English" : "Khmer")
+    .replace("{tools}", tools.length ? TOOLS_PROMPT : "");
+  const messages = [{ role: "system", content: system }, ...s.history, { role: "user", content }];
 
+  let reply;
   try {
-    if (s.model.image) {
-      const { text: caption, images } = await complete(s.model, [{ role: "system", content: IMAGE_PROMPT }, userTurn], true);
-      await dropWait();
-      if (!images.length) {
-        await refund();
-        await call("sendMessage", { chat_id: chatId, text: tx.noImage });
-        return true;
-      }
-      for (const url of images) await sendDataImage(chatId, url, caption.slice(0, 1000));
-      return true;
-    }
-
-    const lang = user?.language === "en" ? "English" : "Khmer";
-    const messages = [{ role: "system", content: SYSTEM_PROMPT.replace("{lang}", lang) }, ...s.history, userTurn];
-    const { text: answer } = await complete(s.model, messages, false);
-    await dropWait();
-    if (!answer) throw new Error("empty answer");
-    // Photos aren't kept in the history -- re-sending one every turn would
-    // multiply the cost; a note that there was one keeps the thread readable.
-    s.history.push({ role: "user", content: text || "[photo]" }, { role: "assistant", content: answer });
-    s.history = s.history.slice(-MAX_TURNS * 2);
-    const parts = chunk(answer, 4000);
-    for (let i = 0; i < parts.length; i++) {
-      const last = i === parts.length - 1;
-      await call("sendMessage", { chat_id: chatId, text: parts[i], ...(last ? { reply_markup: sessionKeyboard(tx) } : {}) });
-    }
+    reply = await complete(s.model, messages, { tools });
   } catch (err) {
     console.error(`AI (${s.model.id}) failed:`, err?.message ?? err);
+    await done();
     await refund();
-    await dropWait();
+    await call("sendMessage", { chat_id: chatId, text: err?.quota ? tx.freeBusy : tx.failed });
+    return true;
+  }
+  await done();
+
+  const remember = (answer) => {
+    // Photos aren't kept -- re-sending one every turn would multiply the
+    // cost; a note that there was one keeps the thread readable.
+    s.history.push({ role: "user", content: text || "[photo]" }, { role: "assistant", content: answer });
+    s.history = s.history.slice(-MAX_TURNS * 2);
+  };
+
+  if (reply.text) {
+    for (const part of chunk(reply.text, 4000)) await call("sendMessage", { chat_id: chatId, text: part });
+  }
+  const tool = reply.toolCalls[0];
+  if (tool?.name === "create_image") {
+    remember(`${reply.text ? `${reply.text}\n` : ""}[made a picture: ${tool.args.prompt ?? ""}]`);
+    await runImage(chatId, user, String(tool.args.prompt || text || ""), photo, menu);
+  } else if (tool?.name === "create_song") {
+    remember(`${reply.text ? `${reply.text}\n` : ""}[made a song: ${tool.args.request ?? ""}]`);
+    await runSong(chatId, user, String(tool.args.request || text || ""), menu);
+  } else if (reply.text) {
+    remember(reply.text);
+  } else {
+    await refund();
     await call("sendMessage", { chat_id: chatId, text: tx.failed });
   }
   return true;
 }
 
-// ------------------------------------------------------------- OpenRouter
+// ------------------------------------------------------------- providers
 
-async function complete(model, messages, wantImage) {
-  const res = await fetch(`${API}/chat/completions`, {
+/**
+ * One chat completion -- OpenRouter, or Google's OpenAI-compatible endpoint
+ * for 🆓 Gemini Free. Returns { text, images, toolCalls }. A model that
+ * refuses the `tools` parameter is retried without it (and remembered).
+ * A rate-limit from Google's free tier throws an error with `quota` set.
+ */
+async function complete(model, messages, { wantImage = false, tools = [] } = {}) {
+  const google = model.provider === "google";
+  const useTools = tools.length && !wantImage && !noTools.has(model.id);
+  const body = {
+    model: model.id,
+    messages,
+    // Gemini's thinking models count thinking against max_tokens and can
+    // come back empty under a cap, so Google gets none.
+    ...(google || wantImage ? {} : { max_tokens: 2000 }),
+    ...(wantImage ? { modalities: ["image", "text"] } : {}),
+    ...(useTools ? { tools, tool_choice: "auto" } : {}),
+  };
+  const res = await fetch(google ? `${GEMINI_API}/chat/completions` : `${API}/chat/completions`, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${config.openrouterApiKey}`,
+      authorization: `Bearer ${google ? config.geminiApiKey : config.openrouterApiKey}`,
       "content-type": "application/json",
-      ...(config.publicUrl ? { "HTTP-Referer": config.publicUrl } : {}),
-      "X-Title": "SaveIt Bot",
+      ...(!google && config.publicUrl ? { "HTTP-Referer": config.publicUrl } : {}),
+      ...(google ? {} : { "X-Title": "SaveIt Bot" }),
     },
-    body: JSON.stringify({
-      model: model.id,
-      messages,
-      max_tokens: wantImage ? undefined : 2000,
-      ...(wantImage ? { modalities: ["image", "text"] } : {}),
-    }),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(120_000),
   });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok || data.error) throw new Error(`OpenRouter ${res.status}: ${JSON.stringify(data.error ?? data).slice(0, 300)}`);
+  const raw = await res.json().catch(() => ({}));
+  const data = Array.isArray(raw) ? raw[0] ?? {} : raw;
+  if (!res.ok || data.error) {
+    const detail = JSON.stringify(data.error ?? data).slice(0, 300);
+    if (useTools && res.status >= 400 && res.status < 500 && /tool|function/i.test(detail)) {
+      noTools.add(model.id);
+      return complete(model, messages, { wantImage, tools: [] });
+    }
+    const err = new Error(`${google ? "Gemini" : "OpenRouter"} ${res.status}: ${detail}`);
+    if (google && res.status === 429) err.quota = true;
+    throw err;
+  }
   const message = data.choices?.[0]?.message ?? {};
   const text = typeof message.content === "string"
     ? message.content
     : (message.content ?? []).filter((p) => p.type === "text").map((p) => p.text).join("");
   const images = (message.images ?? []).map((img) => img?.image_url?.url).filter(Boolean);
-  return { text: String(text ?? "").trim(), images };
+  const toolCalls = (message.tool_calls ?? [])
+    .map((tc) => {
+      let args = {};
+      try {
+        args = JSON.parse(tc.function?.arguments || "{}");
+      } catch {
+        args = {};
+      }
+      return { name: tc.function?.name, args };
+    })
+    .filter((tc) => tc.name);
+  return { text: String(text ?? "").trim(), images, toolCalls };
 }
 
 /** Sends a data: (or https:) image URL as a photo -- sendPhoto's JSON body can't carry bytes. */
@@ -433,17 +818,16 @@ const ELEVEN_API = "https://api.elevenlabs.io/v1";
  * them. The lyrics go out first, so the wait for the audio has something
  * to read. Throws on any failure -- the caller refunds.
  */
-async function makeSong(chatId, user, request, tx) {
+async function makeSong(chatId, request, tx, menu) {
   const wait = await call("sendMessage", { chat_id: chatId, text: tx.writing });
   const waitId = wait?.result?.message_id;
   const say = (text) =>
     waitId ? call("editMessageText", { chat_id: chatId, message_id: waitId, text }).catch(() => {}) : null;
 
-  const menu = await models();
-  const writer = ["claude", "gemini", "gpt", "flash"].map((k) => menu.find((m) => m.key === k)).find(Boolean)
-    ?? menu.find((m) => !m.image && !m.song);
+  const writer = ["claude", "gemini", "gpt", "flash", "gfree"].map((k) => menu.find((m) => m.key === k)).find(Boolean)
+    ?? chatModels(menu)[0];
   if (!writer) throw new Error("no text model for lyrics");
-  const { text: raw } = await complete(writer, [{ role: "system", content: LYRICS_PROMPT }, { role: "user", content: request }], false);
+  const { text: raw } = await complete(writer, [{ role: "system", content: LYRICS_PROMPT }, { role: "user", content: request }]);
   const song = parseSong(raw);
 
   const lyrics = song.sections.map((sec) => `[${sec.name}]\n${sec.lines.join("\n")}`).join("\n\n");
@@ -543,11 +927,17 @@ function chunk(text, size) {
 
 /** /aimodels for the operator: which model each button uses right now. */
 export async function describeModels() {
-  if (!config.openrouterApiKey) return "⚠️ OPENROUTER_API_KEY is not set.";
+  if (!aiOn()) return "⚠️ Neither OPENROUTER_API_KEY nor GEMINI_API_KEY is set.";
   const menu = await models();
   const c = await aiCredits.costs();
-  const lines = menu.map((m) => `${m.label} · ${c[m.tier]} Credit\n  ${m.song ? "ElevenLabs music_v1" : m.id}`);
+  const price = (m) => (m.tier === "free" ? `free, ${config.aiGeminiFreeDaily}/person/day` : `${c[m.tier]} Credit`);
+  const source = (m) => (m.song ? "ElevenLabs music_v1" : m.provider === "google" ? `Google ${m.id}` : m.id);
+  const lines = menu.map((m) => `${m.label} · ${price(m)}\n  ${source(m)}${noTools.has(m.id) ? " (no tools)" : ""}`);
+  const off = [];
+  if (!config.geminiApiKey) off.push("🆓 off: GEMINI_API_KEY not set");
+  if (!config.openrouterApiKey) off.push("OpenRouter models off: OPENROUTER_API_KEY not set");
+  if (!config.elevenlabsApiKey) off.push("🎵 off: ELEVENLABS_API_KEY not set");
   return lines.length
-    ? `${lines.join("\n")}\n\nFree a day: ${config.aiFreeDaily} Credit${config.elevenlabsApiKey ? "" : "\n🎵 off: ELEVENLABS_API_KEY not set"}`
+    ? `${lines.join("\n")}\n\nFree a day: ${config.aiFreeDaily} Credit${off.length ? `\n${off.join("\n")}` : ""}`
     : "⚠️ No models matched.";
 }
