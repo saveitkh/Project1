@@ -34,7 +34,6 @@ const MENU = [
   {
     action: "premium",
     emoji: "dl",
-    style: "primary",
     km: "📥 Telegram Private Link",
     en: "📥 Telegram Private Link",
     aliases: [
@@ -60,7 +59,7 @@ const MENU = [
     // it made the main-menu button wrap to two lines on a phone.
     aliases: ["🎬 មើលរឿង", "🎬 រឿងនិយាយខ្មែរ (សម្រាប់លក់)", "🎬 Khmer-dubbed Shows (for sale)", "🎬 Watch"],
   },
-  { action: "emoji", emoji: "sparkle", style: "primary", km: "✨ Emoji Maker", en: "✨ Emoji Maker", aliases: ["✨ Emoji Maker · បង្កើត Emoji"] },
+  { action: "emoji", emoji: "sparkle", km: "✨ Emoji Maker", en: "✨ Emoji Maker", aliases: ["✨ Emoji Maker · បង្កើត Emoji"] },
   {
     action: "translate",
     emoji: "m_language",
@@ -69,7 +68,7 @@ const MENU = [
     en: "🌐 Translate",
     aliases: ["🌐 Translate · ខ្មែរ ⇄ English"],
   },
-  { action: "ai", emoji: "sparkle", style: "primary", km: "🤖 SaveIt AI", en: "🤖 SaveIt AI", aliases: ["🤖 AI"] },
+  { action: "ai", emoji: "sparkle", style: "success", km: "🤖 SaveIt AI", en: "🤖 SaveIt AI", aliases: ["🤖 AI"] },
   {
     action: "buy",
     emoji: "credit",
@@ -130,7 +129,9 @@ export function actionForLabel(text) {
 export function mainKeyboard(language) {
   const button = (action) => {
     const item = MENU.find((m) => m.action === action);
-    // `style` tints a few key buttons (Telegram's primary / success colours).
+    // `style` tints a few key buttons. Only success/danger here: Telegram
+    // draws the label in its accent blue, so on a "primary" (blue) button the
+    // text vanished and only the icon was left.
     return { text: item[language] ?? item.en, emoji: item.emoji, ...(item.style ? { style: item.style } : {}) };
   };
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
