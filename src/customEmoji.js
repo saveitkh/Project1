@@ -92,6 +92,7 @@ export const EMOJI = {
   ai_openai: ["ai_openai", "⚡"],
   ai_gemini: ["ai_gemini", "✨"],
   ai_elevenlabs: ["ai_elevenlabs", "🎙️"],
+  ai_badge: ["ai_badge", "🤖"],
   ai_grok: ["ai_grok", "🛰️"],
   ai_deepseek: ["ai_deepseek", "🐋"],
 };

@@ -73,6 +73,7 @@ const MENU = [
   // keyboard and in the / command list.
   {
     action: "ai",
+    emoji: "ai_badge",
     style: "success",
     km: "🤖 SaveIt AI",
     en: "🤖 SaveIt AI",

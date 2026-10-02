@@ -1062,13 +1062,12 @@ async function registerBotWebhook() {
     const commands = list.map(([command, description]) => ({ command, description }));
     await botApi("setMyCommands", { commands, ...(language === "en" ? {} : { language_code: language }) }).catch(() => null);
   }
-  // The button beside the message box: always in view, and a Mini App opened
-  // from it receives the signed initData (a reply-keyboard one does not).
-  const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
-  if (appUrl) {
-    const menu = await botApi("setChatMenuButton", { menu_button: { type: "web_app", text: "📲 Open App", web_app: { url: appUrl } } }).catch(() => null);
-    if (menu?.ok) console.log(`Chat menu button opens ${appUrl}`);
-  }
+  // The button beside the message box: the native "/" command list (so
+  // /start -- a quick restart -- is always one tap away), rather than a
+  // web_app launcher. Opening the Mini App stays on its own big keyboard
+  // button (mainKeyboard's "Open App" row) for whoever needs it.
+  const commandsMenu = await botApi("setChatMenuButton", { menu_button: { type: "commands" } }).catch(() => null);
+  if (commandsMenu?.ok) console.log("Chat menu button shows the / command list");
 }
 
 const server = app.listen(config.port, () => {
