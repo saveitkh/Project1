@@ -14,6 +14,10 @@ The app sets the Telegram webhook to `PUBLIC_URL` on startup, so once it's
 up the bot answers from the VPS. Stop the Railway service so the two don't
 fight over the webhook.
 
+- Update after a new push (pull, rebuild, then health check): `bash update.sh`
+- Is it working? `bash check.sh` — ✅/❌ per check, with the fix for each ❌
 - Logs: `docker compose logs -f app`
-- Update after a new push: `git pull && docker compose up -d --build`
 - Restart: `docker compose restart app`
+
+Step-by-step guide in Khmer, including how to read build output and a
+table of common errors: [GUIDE-KM.md](GUIDE-KM.md)
