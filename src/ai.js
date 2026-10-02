@@ -266,7 +266,7 @@ let geminiModel = null;
 let geminiModelAt = 0;
 
 /** Google's newest stable Flash (or GEMINI_FREE_MODEL), for 🆓 Gemini Free. */
-async function geminiFreeModel() {
+export async function geminiFreeModel() {
   if (config.geminiFreeModel) return config.geminiFreeModel;
   if (geminiModel && Date.now() - geminiModelAt < CATALOG_TTL_MS) return geminiModel;
   try {

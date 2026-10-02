@@ -219,6 +219,7 @@ export const BOT_COMMANDS = {
     ["ai_credit", "💳 AI Credit · ទិញបន្ថែម"],
     ["free", "⬇️ ទាញយកវីដេអូ"],
     ["translate", "🌐 បកប្រែភាសា"],
+    ["dub", "🎬 ប្រែវីដេអូជាខ្មែរ"],
     ["account", "👤 គណនី"],
     ["help", "❓ ជំនួយ"],
   ],
@@ -239,6 +240,7 @@ export const BOT_COMMANDS = {
     ["ai_credit", "💳 AI Credit · buy more"],
     ["free", "⬇️ Download videos"],
     ["translate", "🌐 Translate"],
+    ["dub", "🎬 Dub video to Khmer"],
     ["account", "👤 Account"],
     ["help", "❓ Help"],
   ],
@@ -263,7 +265,8 @@ const TEXT = {
       `2️⃣ ផ្ញើវាមកក្នុងការសន្ទនានេះ\n` +
       `3️⃣ រង់ចាំបន្តិច — ខ្ញុំផ្ញើឯកសារ ឬ តំណទាញយកមកវិញ\n\n` +
       `{:bulb:} ឯកសារធំជាង 50MB ខ្ញុំផ្ញើជា តំណ ជំនួស (កំណត់របស់ Telegram សម្រាប់ bot)។\n` +
-      `{:bulb:} ចង់យកតែសំឡេង? ផ្ញើតំណរួចសរសេរ audio នៅខាងក្រោយ។`,
+      `{:bulb:} ចង់យកតែសំឡេង? ផ្ញើតំណរួចសរសេរ audio នៅខាងក្រោយ។\n` +
+      `{:bulb:} /dub — ផ្ញើវីដេអូខ្លី (< 6 នាទី) ឲ្យខ្ញុំអានជាសំឡេងខ្មែរឡើងវិញ។`,
     accountTitle: "ព័ត៌មានគណនី",
     fieldId: "ID",
     fieldUsername: "Username",
@@ -370,7 +373,8 @@ const TEXT = {
       `2️⃣ Send it to this chat\n` +
       `3️⃣ Wait a moment — I send back the file, or a download link\n\n` +
       `{:bulb:} Files over 50MB come back as a link instead (Telegram's own limit for bots).\n` +
-      `{:bulb:} Want audio only? Send the link followed by: audio`,
+      `{:bulb:} Want audio only? Send the link followed by: audio\n` +
+      `{:bulb:} /dub — send a short video (< 6 min) and I'll read it back in Khmer.`,
     accountTitle: "Account",
     fieldId: "ID",
     fieldUsername: "Username",

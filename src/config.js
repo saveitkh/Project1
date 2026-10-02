@@ -77,6 +77,13 @@ export const config = {
   groqFreeModel: str("GROQ_FREE_MODEL"),
   aiGroqFreeDaily: int("AI_GROQ_FREE_DAILY", 15),
 
+  // 🎬 Video Dub: /dub listens to a short video with Gemini (reuses
+  // GEMINI_API_KEY above) and reads the Khmer translation back over it with a
+  // free Microsoft Edge neural voice (no key needed). Capped per person per
+  // day since it shares Gemini's one free quota with the rest of the bot.
+  dubFreeDaily: int("DUB_FREE_DAILY", 3),
+  dubVoice: str("DUB_VOICE", "km-KH-SreymomNeural"),
+
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),
   telegramPhone: str("TELEGRAM_PHONE"),

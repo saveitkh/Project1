@@ -26,6 +26,7 @@ import * as botPay from "./botPay.js";
 import * as emojiMaker from "./emojiMaker.js";
 import * as khInvoice from "./khInvoice.js";
 import * as translate from "./translate.js";
+import * as videoDub from "./videoDub.js";
 import * as watch from "./watch.js";
 import { db, nowIso, rows } from "./db.js";
 import { withFloodRetry } from "./floodRetry.js";
@@ -267,6 +268,11 @@ export async function handleMessage(message) {
   // for is an emoji, not a payment screenshot.
   if (text !== "/emoji" && !/^\/start\b/.test(text) && !actionForLabel(text) && (await emojiMaker.handleMessage(message, user))) return;
 
+  // A video for /dub (while it waits for one, or captioned /dub) -- checked
+  // ahead of the Emoji Maker's own video handling having already passed, so
+  // the two never fight over the same clip (each only claims its own wait).
+  if (text !== "/dub" && !/^\/start\b/.test(text) && !actionForLabel(text) && (await videoDub.handleMessage(message, user))) return;
+
   // A photo captioned /setshow, from the operator: the show's poster,
   // downloaded and turned into a custom emoji for it (see watch.setShow).
   if (message.photo && botPay.isAdminChat(chatId)) {
@@ -343,6 +349,7 @@ export async function handleMessage(message) {
     watch.cancelPending(chatId);
     emojiMaker.cancel(chatId);
     translate.cancel(chatId);
+    videoDub.cancel(chatId);
     return;
   }
 
@@ -360,6 +367,7 @@ export async function handleMessage(message) {
     if (action !== "emoji") emojiMaker.cancel(chatId);
     if (action !== "translate") translate.cancel(chatId);
     if (action !== "ai") ai.cancel(chatId);
+    if (action !== "dub") videoDub.cancel(chatId);
     // A new section replaces the last one: its screens and the tapped
     // button's own message go, so only what was just asked for is shown.
     await clearScreens(chatId, message.message_id);
@@ -371,6 +379,8 @@ export async function handleMessage(message) {
       return translate.ask(chatId, user);
     case "ai":
       return ai.ask(chatId, user);
+    case "dub":
+      return videoDub.ask(chatId, user);
     case "invoice":
       return khInvoice.enterSection(chatId, user);
     case "watch":
@@ -774,6 +784,7 @@ function commandAction(text) {
     case "/emoji": return "emoji";
     case "/translate": return "translate";
     case "/ai": return "ai";
+    case "/dub": return "dub";
     default: return null;
   }
 }
