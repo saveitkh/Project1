@@ -19,6 +19,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "./config.js";
 import { actionForLabel, languageKeyboard, mainKeyboard, progressBar, texts } from "./botText.js";
 import * as ai from "./ai.js";
+import * as aiCredits from "./aiCredits.js";
 import * as botDeliver from "./botDeliver.js";
 import * as botJobs from "./botJobs.js";
 import * as botPay from "./botPay.js";
@@ -437,6 +438,29 @@ async function handleAdminCommand(chatId, text) {
     return true;
   }
 
+  // /aigive <telegram user id> <credits>: AI Credit by hand (a refund, a
+  // gift, or a paid order whose grant failed). Negative takes it back.
+  const aiGive = /^\/aigive\s+(\d+)\s+(-?\d+)$/.exec(text);
+  if (aiGive) {
+    try {
+      const left = await aiCredits.grant(aiGive[1], Number(aiGive[2]));
+      await send(chatId, `✅ ${aiGive[1]}: ${Number(aiGive[2]) >= 0 ? "+" : ""}${aiGive[2]} AI Credit → ${left}`);
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
+  if (text === "/aigive" || text === "/aicredit") {
+    await send(chatId, "/aigive <telegram user id> <credits> — add (or, negative, remove) AI Credit\n/aicredit <telegram user id> — show a balance\n/aimodels — models, prices, free Credit");
+    return true;
+  }
+  const aiCredit = /^\/aicredit\s+(\d+)$/.exec(text);
+  if (aiCredit) {
+    const { free, paid } = await aiCredits.balance(aiCredit[1]);
+    await send(chatId, `${aiCredit[1]}: 🎁 ${free} free today · 💳 ${paid} bought`);
+    return true;
+  }
+
   if (text === "/stats") {
     const users = rows(await db().from("bot_users").select("telegram_user_id, created_at"));
     const jobs = rows(await db().from("bot_jobs").select("id, created_at"));
@@ -728,6 +752,9 @@ export async function handleCallback(cq) {
 
   if (kind !== "lang") {
     const user = await ensureUser(cq.from, null);
+    // Buying: the receipt screenshot that follows is for the payment, not
+    // a question for an AI model still waiting in this chat.
+    if (kind === "buy" || kind === "bank") ai.cancel(chatId);
     return botPay.handlePayCallback(cq, user);
   }
 

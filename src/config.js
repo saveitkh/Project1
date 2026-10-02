@@ -44,10 +44,12 @@ export const config = {
   anthropicApiKey: str("ANTHROPIC_API_KEY"),
 
   // SaveIt AI (ai.js), through OpenRouter. Unset key = the AI button says
-  // it's off. AI_MODELS ("id|Label,id|Label") replaces the auto-picked menu;
-  // AI_DAILY_LIMIT caps uses per person per day (0 = no cap; the operator is
-  // never capped).
+  // it's off. AI_MODELS ("id|Label,id|Label") replaces the auto-picked menu.
+  // Uses are paid in AI Credit (aiCredits.js): AI_FREE_DAILY free Credit per
+  // person per day, AI_COSTS the price per kind of use. ELEVENLABS_API_KEY
+  // turns on 🎵 songs, AI_SONG_SECONDS their length.
   openrouterApiKey: str("OPENROUTER_API_KEY"),
+  elevenlabsApiKey: str("ELEVENLABS_API_KEY"),
   aiModels: str("AI_MODELS")
     .split(",")
     .map((entry) => entry.trim())
@@ -56,7 +58,9 @@ export const config = {
       const [id, label] = entry.split("|").map((x) => x.trim());
       return { id, label: label || id };
     }),
-  aiDailyLimit: int("AI_DAILY_LIMIT", 30),
+  aiFreeDaily: int("AI_FREE_DAILY", 5),
+  aiCosts: str("AI_COSTS"),
+  aiSongSeconds: int("AI_SONG_SECONDS", 120),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),

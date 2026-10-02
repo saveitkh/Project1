@@ -19,6 +19,7 @@ import { applyAutoRules, retryFailed, runDownload } from "./downloader.js";
 import * as forwarder from "./forwarder.js";
 import * as khInvoice from "./khInvoice.js";
 import * as watch from "./watch.js";
+import * as aiCredits from "./aiCredits.js";
 import { handleCallback as handleBotCallback, handleMessage as handleLinkBotMessage } from "./linkBot.js";
 import * as translate from "./translate.js";
 import { recordManualUpload } from "./library.js";
@@ -1069,6 +1070,7 @@ const server = app.listen(config.port, () => {
   void registerBotWebhook();
   void khInvoice.announce();
   void watch.announce();
+  void aiCredits.announce().catch((err) => console.error("AI Credit packages:", err?.message ?? err));
   void loop();
 });
 

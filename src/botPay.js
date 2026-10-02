@@ -19,6 +19,7 @@ import { PNG } from "pngjs";
 import { config } from "./config.js";
 import { db, nowIso, rows } from "./db.js";
 import { paymentSettings, savePaymentSettings } from "./botConfig.js";
+import * as aiCredits from "./aiCredits.js";
 import { buildPack, decorate, refusedEmoji } from "./customEmoji.js";
 import { progressBar } from "./botText.js";
 import { applyKhqrTemplate, khqrMd5, parseKhqr, validateKhqrTemplate } from "./khqr.js";
@@ -152,7 +153,7 @@ function formatDate(iso) {
 /** SaveIt's own packs. KH Invoice plans live in the same table but have their own screen. */
 async function packages() {
   const all = rows(await db().from("bot_packages").select("*").eq("active", true).order("sort"));
-  return all.filter((pkg) => !khInvoice.isInvoicePackage(pkg.id) && !watch.isWatchPackage(pkg.id));
+  return all.filter((pkg) => !khInvoice.isInvoicePackage(pkg.id) && !watch.isWatchPackage(pkg.id) && !aiCredits.isAiPackage(pkg.id));
 }
 
 function packageTitle(pkg, language) {
@@ -165,7 +166,7 @@ function packageTitle(pkg, language) {
  * granted. KH Invoice plans keep their own titles.
  */
 function packageLabel(pkg, language) {
-  if (khInvoice.isInvoicePackage(pkg.id) || watch.isWatchPackage(pkg.id)) return packageTitle(pkg, language);
+  if (khInvoice.isInvoicePackage(pkg.id) || watch.isWatchPackage(pkg.id) || aiCredits.isAiPackage(pkg.id)) return packageTitle(pkg, language);
   const s = t(language);
   return pkg.downloads ? s.creditPack(pkg.downloads) : s.vipPack(pkg.days);
 }
@@ -304,6 +305,24 @@ async function grant(order, confirmedBy, bankHash = null) {
         await call("sendMessage", {
           chat_id: config.telegramAdminChatId,
           text: `{:warn:} KH Invoice activation failed for paid order ${order.ticket} (user ${order.telegram_user_id}): ${String(err?.message ?? err).slice(0, 300)}\nRetry with /invactivate ${order.ticket}`,
+        });
+      }
+    }
+    return true;
+  }
+
+  if (aiCredits.isAiPackage(pkg.id)) {
+    // AI Credit, its own balance (aiCredits.js). The order is already
+    // marked paid, so a failed write is the operator's to fix by hand with
+    // /aigive -- the payer is never asked to pay twice.
+    try {
+      await call("sendMessage", { chat_id: order.chat_id, text: await aiCredits.grantedText(user.language, pkg.downloads, user) });
+    } catch (err) {
+      console.error(`AI Credit grant for ${order.ticket} failed:`, err?.message ?? err);
+      if (config.telegramAdminChatId) {
+        await call("sendMessage", {
+          chat_id: config.telegramAdminChatId,
+          text: `{:warn:} AI Credit grant failed for paid order ${order.ticket}: ${String(err?.message ?? err).slice(0, 300)}\nGive it by hand: /aigive ${user.telegram_user_id} ${pkg.downloads}`,
         });
       }
     }
