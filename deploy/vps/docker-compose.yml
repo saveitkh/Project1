@@ -1,0 +1,31 @@
+# Runs the bot on a plain VPS instead of Railway: the app container plus
+# Caddy in front of it, which gets a Let's Encrypt certificate on its own.
+# Telegram only delivers webhooks over HTTPS, so the bot can't sit on a bare
+# IP and port the way it could behind Railway's proxy.
+services:
+  app:
+    build: ../..
+    env_file: .env
+    environment:
+      PORT: "8000"
+    restart: unless-stopped
+    volumes:
+      - downloads:/tmp/tg-downloads
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    depends_on:
+      - app
+
+volumes:
+  downloads:
+  caddy_data:
