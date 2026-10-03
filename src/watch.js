@@ -768,11 +768,19 @@ async function purchase(chatId, user, episodeId, label) {
       delete bought[episodeId];
       await saveWallet(user.telegram_user_id, { ...fresh, credits: (fresh.credits ?? 0) + credits, bought });
     }
-    await call("sendMessage", { chat_id: chatId, text: t.deliverFailed });
-    if (config.telegramAdminChatId && String(config.telegramAdminChatId) !== String(chatId)) {
+    // The detailed reason used to only ever reach a *separate* admin chat --
+    // when the person hitting the failure IS the admin (testing their own
+    // bot, say), that message was skipped as redundant and they were left
+    // with only the generic "contact the operator" text, unable to contact
+    // anyone more informed than themselves. Now the admin gets the reason
+    // inline instead.
+    const detail = `${delivered.reason ?? "?"}${delivered.error ? ` -- ${delivered.error}` : ""}`;
+    const isAdminChat = Boolean(config.telegramAdminChatId) && String(config.telegramAdminChatId) === String(chatId);
+    await call("sendMessage", { chat_id: chatId, text: isAdminChat ? `${t.deliverFailed}\n\n🔧 ${detail}` : t.deliverFailed });
+    if (config.telegramAdminChatId && !isAdminChat) {
       await call("sendMessage", {
         chat_id: config.telegramAdminChatId,
-        text: `⚠️ Watch delivery failed\nShow: ${topic?.title ?? episode.topic_id}\nEP: ${label}\nEpisode id: ${episode.id}\nReason: ${delivered.reason ?? "?"} ${delivered.error ?? ""}`,
+        text: `⚠️ Watch delivery failed\nShow: ${topic?.title ?? episode.topic_id}\nEP: ${label}\nEpisode id: ${episode.id}\nReason: ${detail}`,
       }).catch(() => {});
     }
     return "failed";
