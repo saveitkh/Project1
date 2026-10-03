@@ -146,7 +146,9 @@ const TEXT = {
       `👁 ផ្ញើរូបមក — AI មើល អាន ដោះស្រាយ\n` +
       `🎨 «គូររូប…» — AI បង្កើតរូបភាព\n` +
       `🎵 «បង្កើតចម្រៀង…» — AI និពន្ធ និងច្រៀង\n` +
-      `គ្រាន់តែសរសេរមក — AI យល់ខ្លួនឯងថាត្រូវឆ្លើយ គូរ ឬច្រៀង។\n` +
+      `គ្រាន់តែសរសេរមក — AI យល់ខ្លួនឯងថាត្រូវឆ្លើយ គូរ ឬច្រៀង។\n\n` +
+      `🎬 /dub — ផ្ញើវីដេអូខ្លី ឲ្យខ្ញុំអានសំឡេងជាខ្មែរវិញ\n` +
+      `🎙 /redub — ផ្ញើវីដេអូ រួចផ្ញើសំឡេងអ្នក ឲ្យខ្ញុំជំនួសសំឡេងដើម\n` +
       `${SEP}\n` +
       `📋 Model · Credit ក្នុងមួយសារ\n${models}\n` +
       `${SEP}\n` +
@@ -194,7 +196,9 @@ const TEXT = {
       `👁 Send a photo — the AI looks, reads, solves\n` +
       `🎨 "Draw…" — the AI makes a picture\n` +
       `🎵 "Make a song…" — the AI writes and sings it\n` +
-      `Just write — the AI works out whether to answer, draw or sing.\n` +
+      `Just write — the AI works out whether to answer, draw or sing.\n\n` +
+      `🎬 /dub — send a short video and I'll read it back in Khmer\n` +
+      `🎙 /redub — send a video, then your own voice, and I'll swap it in\n` +
       `${SEP}\n` +
       `📋 Model · Credit per message\n${models}\n` +
       `${SEP}\n` +
