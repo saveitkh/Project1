@@ -1,57 +1,92 @@
 /**
- * Text translation: tap "🌐 Translate", send a message, get it back in the
- * other language. Uses Google's public translate endpoint (the same one
- * translate.google.com's own web page calls) -- free, no API key, no
- * billing account to set up, unlike the official Cloud Translation API.
+ * Text translation: tap "🌐 Translate" and the keyboard switches to its own
+ * -- pick a target language (or leave it on "ស្វ័យប្រវត្តិ" auto, which goes
+ * Khmer ⇄ English by detecting which one arrived) -- then just send text,
+ * one message after another, until "⬅️ ម៉ឺនុយដើម" leaves the section. Uses
+ * Google's public translate endpoint (the same one translate.google.com's
+ * own web page calls) -- free, no API key, no billing account to set up,
+ * unlike the official Cloud Translation API.
  */
+import { mainKeyboard } from "./botText.js";
 import { call } from "./notifyBot.js";
+
+const LANGS = [
+  ["km", "🇰🇭 ខ្មែរ"],
+  ["en", "🇬🇧 English"],
+  ["zh", "🇨🇳 中文"],
+  ["th", "🇹🇭 ไทย"],
+  ["vi", "🇻🇳 Tiếng Việt"],
+];
 
 const TEXT = {
   km: {
     ask:
       "{:m_language:} បកប្រែភាសា\n\n" +
-      "ផ្ញើអត្ថបទដែលចង់បកប្រែមកខ្ញុំ — ខ្ញុំនឹងស្គាល់ភាសា ហើយបកអោយភ្លាម (ខ្មែរ ⇄ អង់គ្លេស ស្វ័យប្រវត្តិ)។\n" +
-      "{:bulb:} ចុចប៊ូតុង 🇨🇳 🇹🇭 🇻🇳 ក្រោមលទ្ធផល ដើម្បីបកទៅភាសាផ្សេងទៀតភ្លាម។",
+      "ជ្រើសរើសភាសាគោលដៅខាងក្រោម រួចផ្ញើអត្ថបទមក — ឬទុកលំនាំដើម «ស្វ័យប្រវត្តិ» ឲ្យខ្ញុំស្គាល់ភាសាខ្លួនឯង (ខ្មែរ ⇄ អង់គ្លេស)។",
+    autoSet: "{:ok:} ស្វ័យប្រវត្តិ — ខ្មែរ ⇄ អង់គ្លេស។ ផ្ញើអត្ថបទមក។",
+    targetSet: (label) => `{:ok:} ឥឡូវបកប្រែទៅ ${label} ស្វ័យប្រវត្តិ — ផ្ញើអត្ថបទមក។`,
     working: "{:wait:} កំពុងបកប្រែ…",
     failed: "{:fail:} បកប្រែមិនបានទេ សូមសាកម្ដងទៀត។",
-    inlineHint:
-      "\n\n{:bulb:} ថ្មី! បកប្រែក្នុង chat ណាក៏បាន — វាយ {bot} រួចអត្ថបទ ក្នុងប្រអប់សារ ហើយចុចលទ្ធផលដើម្បីផ្ញើ។",
-    inlineButton: "🌐 បកប្រែក្នុង chat ផ្សេង",
+    inlineHint: "\n\n{:bulb:} ក៏អាចបកប្រែក្នុង chat ណាក៏បាន — វាយ {bot} រួចអត្ថបទ ក្នុងប្រអប់សារ ហើយចុចលទ្ធផលដើម្បីផ្ញើ។",
+    auto: "🔄 ស្វ័យប្រវត្តិ",
+    back: "⬅️ ម៉ឺនុយដើម",
+    backDone: "{:ok:} ត្រឡប់មកម៉ឺនុយដើម។",
   },
   en: {
     ask:
       "{:m_language:} Translate\n\n" +
-      "Send me the text you want translated — I'll detect the language and translate it automatically (Khmer ⇄ English).\n" +
-      "{:bulb:} Tap the 🇨🇳 🇹🇭 🇻🇳 buttons under a result to translate it into another language too.",
+      "Pick a target language below, then send text — or leave it on \"Auto\" and I'll detect Khmer ⇄ English on my own.",
+    autoSet: "{:ok:} Auto -- Khmer ⇄ English. Send me some text.",
+    targetSet: (label) => `{:ok:} Now translating to ${label} automatically -- send me some text.`,
     working: "{:wait:} Translating…",
     failed: "{:fail:} Couldn't translate that. Please try again.",
-    inlineHint:
-      "\n\n{:bulb:} New! Translate in any chat — type {bot} followed by your text in the message box, then tap a result to send it.",
-    inlineButton: "🌐 Translate in another chat",
+    inlineHint: "\n\n{:bulb:} You can also translate in any chat -- type {bot} followed by your text in the message box, then tap a result to send it.",
+    auto: "🔄 Auto",
+    back: "⬅️ Main menu",
+    backDone: "{:ok:} Back to the main menu.",
   },
 };
+const tx = (language) => TEXT[language] ?? TEXT.km;
 
-// Waiting for the text to translate. In memory on purpose: a restart just
-// means the person taps the button again.
-const waiting = new Map();
-const WAIT_MS = 10 * 60_000;
+// Session per chat: which target language is pinned (null = auto-detect).
+// Long-lived, like the AI's own keyboard -- someone coming back later is
+// still in Translate, not told "that isn't a link".
+const sessions = new Map(); // chatId -> { target: string|null, at }
+const SESSION_MS = 2 * 60 * 60_000;
 
-// The original text behind each "🇨🇳 🇹🇭 🇻🇳" button below a translation --
-// callback_data can't carry the text itself (Telegram's 64-byte limit), so a
-// short id stands in for it here instead, swept for staleness on insert.
-const pending = new Map(); // id -> { text, at }
-function remember(text) {
-  const cutoff = Date.now() - WAIT_MS;
-  for (const [id, e] of pending) if (e.at < cutoff) pending.delete(id);
-  const id = Math.random().toString(36).slice(2, 10);
-  pending.set(id, { text, at: Date.now() });
-  return id;
+function session(chatId) {
+  const s = sessions.get(chatId);
+  if (!s) return null;
+  if (Date.now() - s.at > SESSION_MS) {
+    sessions.delete(chatId);
+    return null;
+  }
+  return s;
 }
-const MORE_LANGS = [
-  ["zh", "🇨🇳 中文"],
-  ["th", "🇹🇭 ไทย"],
-  ["vi", "🇻🇳 Tiếng Việt"],
-];
+
+/** Whether this chat is in Translate (its own keyboard is on screen). */
+export function isActive(chatId) {
+  return Boolean(session(chatId));
+}
+
+export function cancel(chatId) {
+  sessions.delete(chatId);
+}
+
+function keyboard() {
+  const t = tx();
+  return {
+    keyboard: [
+      [{ text: t.auto }],
+      [{ text: LANGS[0][1] }, { text: LANGS[1][1] }],
+      [{ text: LANGS[2][1] }, { text: LANGS[3][1] }],
+      [{ text: LANGS[4][1] }],
+      [{ text: t.back }],
+    ],
+    resize_keyboard: true,
+    is_persistent: true,
+  };
+}
 
 let botName = null;
 async function botUsername() {
@@ -59,29 +94,47 @@ async function botUsername() {
   return botName;
 }
 
+/** "🌐 Translate" (or /translate): switches the keyboard to Translate's own. */
 export async function ask(chatId, user) {
-  waiting.set(chatId, { at: Date.now() });
-  const t = TEXT[user.language] ?? TEXT.km;
+  sessions.set(chatId, { target: null, at: Date.now() });
+  const t = tx(user.language);
   const name = await botUsername().catch(() => null);
   return call("sendMessage", {
     chat_id: chatId,
     text: t.ask + t.inlineHint.replace("{bot}", name ? `@${name}` : "@bot"),
-    reply_markup: { inline_keyboard: [[{ text: t.inlineButton, style: "primary", switch_inline_query: "" }]] },
+    reply_markup: keyboard(),
   });
 }
 
-export function cancel(chatId) {
-  waiting.delete(chatId);
-}
+/**
+ * A tap on Translate's own keyboard -- a language, auto, or back to the main
+ * menu. Returns true when it handled it.
+ */
+export async function handleButton(chatId, user, text) {
+  const s = session(chatId);
+  if (!s) return false;
+  const t = tx(user.language);
+  const said = String(text ?? "").trim();
 
-function isWaiting(chatId) {
-  const w = waiting.get(chatId);
-  if (!w) return false;
-  if (Date.now() - w.at > WAIT_MS) {
-    waiting.delete(chatId);
-    return false;
+  if (said === t.back) {
+    cancel(chatId);
+    await call("sendMessage", { chat_id: chatId, text: t.backDone, reply_markup: mainKeyboard(user.language) });
+    return true;
   }
-  return true;
+  if (said === t.auto) {
+    s.target = null;
+    s.at = Date.now();
+    await call("sendMessage", { chat_id: chatId, text: t.autoSet });
+    return true;
+  }
+  const found = LANGS.find(([, label]) => said === label);
+  if (found) {
+    s.target = found[0];
+    s.at = Date.now();
+    await call("sendMessage", { chat_id: chatId, text: t.targetSet(found[1]) });
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -132,23 +185,19 @@ export async function handleInlineQuery(iq) {
 }
 
 /**
- * A message while waiting for text to translate. Khmer goes to English;
- * anything else detected goes to Khmer. Returns true when it handled it.
+ * A message while in Translate: the pinned target language if one was
+ * picked, otherwise auto-detect (Khmer goes to English; anything else goes
+ * to Khmer). Returns true when it handled it.
  */
 export async function handleText(chatId, user, text) {
-  if (!isWaiting(chatId)) return false;
-  waiting.delete(chatId);
-  const t = TEXT[user.language] ?? TEXT.km;
+  const s = session(chatId);
+  if (!s) return false;
+  s.at = Date.now();
+  const t = tx(user.language);
   await call("sendMessage", { chat_id: chatId, text: t.working });
   try {
-    const toKm = await translateText(text, "km");
-    const result = toKm.detected === "km" ? await translateText(text, "en") : toKm;
-    const id = remember(text);
-    await call("sendMessage", {
-      chat_id: chatId,
-      text: result.translated || t.failed,
-      reply_markup: { inline_keyboard: [MORE_LANGS.map(([code, label]) => ({ text: label, callback_data: `tr:${code}:${id}` }))] },
-    });
+    const result = s.target ? await translateText(text, s.target) : await autoTranslate(text);
+    await call("sendMessage", { chat_id: chatId, text: result.translated || t.failed });
   } catch (err) {
     console.error("Translate failed:", err?.message ?? err);
     await call("sendMessage", { chat_id: chatId, text: t.failed });
@@ -156,21 +205,7 @@ export async function handleText(chatId, user, text) {
   return true;
 }
 
-/** A tap on 🇨🇳/🇹🇭/🇻🇳 under a translation: the same source text, that language. */
-export async function handleCallback(cq) {
-  const [, code, id] = String(cq?.data ?? "").split(":");
-  const entry = pending.get(id);
-  const chatId = cq.message?.chat?.id;
-  if (!entry || !chatId) {
-    await call("answerCallbackQuery", { callback_query_id: cq.id, text: "⌛", show_alert: false });
-    return true;
-  }
-  await call("answerCallbackQuery", { callback_query_id: cq.id });
-  try {
-    const { translated } = await translateText(entry.text, code);
-    await call("sendMessage", { chat_id: chatId, text: translated || "…" });
-  } catch (err) {
-    console.error("Translate (more languages) failed:", err?.message ?? err);
-  }
-  return true;
+async function autoTranslate(text) {
+  const toKm = await translateText(text, "km");
+  return toKm.detected === "km" ? translateText(text, "en") : toKm;
 }

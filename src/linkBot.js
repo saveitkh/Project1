@@ -365,6 +365,17 @@ export async function handleMessage(message) {
     return;
   }
 
+  // Translate's own keyboard (a target language, auto, ⬅️ main menu).
+  if (await translate.handleButton(chatId, user, text)) {
+    khInvoice.cancelPending(chatId);
+    watch.cancelPending(chatId);
+    emojiMaker.cancel(chatId);
+    ai.cancel(chatId);
+    videoDub.cancel(chatId);
+    voiceInsert.cancel(chatId);
+    return;
+  }
+
   if (await khInvoice.handleSectionButton(chatId, user, text, mainKeyboard(user.language))) return;
 
   const watchButton = await watch.handleSectionButton(chatId, user, text);
@@ -820,9 +831,6 @@ export async function handleCallback(cq) {
   }
   if (data.startsWith("ai:") && cq.from?.id) {
     return ai.handleCallback(cq, await ensureUser(cq.from, null));
-  }
-  if (data.startsWith("tr:")) {
-    return translate.handleCallback(cq);
   }
   if (data.startsWith("watch:") && cq.from?.id) {
     return watch.handleCallback(cq, await ensureUser(cq.from, null));

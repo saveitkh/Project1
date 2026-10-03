@@ -94,6 +94,11 @@ const MENU = [
     en: "🎁 Invite friends",
     aliases: ["🎁 ណែនាំមិត្ត · ទទួល Free Credit", "🎁 Invite friends · Get Free Credit", "👥 ណែនាំមិត្ត", "👥 Referral"],
   },
+  // Not on the main keyboard -- these are the AI's own two video tools
+  // (ai.js's aiKeyboard adds the buttons), registered here only so tapping
+  // one resolves to an action the same way every other button does.
+  { action: "dub", emoji: "video", km: "🎬 ប្ដូរវីដេអូជាខ្មែរ", en: "🎬 Dub video to Khmer" },
+  { action: "redub", km: "🎙 ប្ដូរសំឡេងជារបស់អ្នក", en: "🎙 Replace voice with mine" },
   // Kept for the commands and older keyboards; now reached from Account.
   { action: "history", emoji: "m_history", km: "📜 ប្រវត្តិ", en: "📜 History" },
   { action: "language", emoji: "m_language", km: "🌐 ភាសា", en: "🌐 Language" },
@@ -145,15 +150,16 @@ export function mainKeyboard(language) {
     return { text: item[language] ?? item.en, emoji: item.emoji, ...(item.style ? { style: item.style } : {}) };
   };
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
-  // The dashboard, top to bottom: the AI headline, then pairs grouped by
-  // what they're for -- downloading, watching & words, tools, your account
-  // -- with the colour on the one button of each pair people tap most.
-  // History, language and help live under Account; Open App closes the list.
+  // The dashboard, top to bottom: the AI headline, Manage Business right
+  // under it (the operator's own daily tool), then pairs grouped by what
+  // they're for -- downloading, watching & words, your account -- with the
+  // colour on the one button of each pair people tap most. History, language
+  // and help live under Account; Open App closes the list.
   const rows = [
     [button("ai")],
+    ...(config.khInvoiceBridgeSecret ? [[button("invoice"), button("emoji")]] : [[button("emoji")]]),
     [button("free"), button("premium")],
     [button("watch"), button("translate")],
-    config.khInvoiceBridgeSecret ? [button("invoice"), button("emoji")] : [button("emoji")],
     [button("buy"), button("account")],
     [button("referral")],
   ];

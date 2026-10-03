@@ -106,6 +106,15 @@ const BUTTONS = {
   menu: { km: "⬅️ ម៉ឺនុយដើម", en: "⬅️ Main menu", emoji: null },
 };
 
+// The exact labels botText.js's MENU registers for "dub"/"redub" (see there)
+// -- kept as literal strings on purpose, not imported, so tapping one here
+// still resolves through the ordinary action router rather than ai.js's own
+// buttonFor()/BUTTONS, which don't know those two keys.
+const DUB_REDUB = {
+  dub: { km: "🎬 ប្ដូរវីដេអូជាខ្មែរ", en: "🎬 Dub video to Khmer", emoji: "video" },
+  redub: { km: "🎙 ប្ដូរសំឡេងជារបស់អ្នក", en: "🎙 Replace voice with mine", emoji: null },
+};
+
 // Slash commands that jump straight to a model or mode (see BOT_COMMANDS in
 // botText.js for the list Telegram shows).
 const COMMANDS = {
@@ -432,6 +441,11 @@ function aiKeyboard(menu, user) {
   if (imageModel(menu)) tools.push(btn(BUTTONS.image[l], BUTTONS.image.emoji));
   if (menu.some((m) => m.song)) tools.push(btn(BUTTONS.song[l], BUTTONS.song.emoji));
   if (tools.length) rows.push(tools);
+  // /dub and /redub aren't ai.js's own modes (see videoDub.js/voiceInsert.js)
+  // -- these buttons just carry their exact main-menu label, so the tap falls
+  // through to the ordinary action router once handleButton below shrugs at
+  // it, the same path "/dub" or "/redub" typed by hand already takes.
+  rows.push([btn(DUB_REDUB.dub[l], DUB_REDUB.dub.emoji), btn(DUB_REDUB.redub[l])]);
   rows.push([btn(BUTTONS.new[l]), btn(BUTTONS.credit[l], BUTTONS.credit.emoji)]);
   rows.push([btn(BUTTONS.menu[l])]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
