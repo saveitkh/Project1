@@ -327,6 +327,10 @@ export async function handleMessage(message) {
     }
   }
 
+  // A voice note while a SaveIt AI model is chosen: transcribed and answered
+  // like a typed message, with the reply spoken back too (see ai.handleVoice).
+  if (message.voice && ai.isActive(chatId) && (await ai.handleVoice(chatId, user, message.voice))) return;
+
   if (message.photo && (await botPay.handlePhoto(message, user))) return;
 
   // A message forwarded out of the storage channel names it, so the operator
@@ -816,6 +820,9 @@ export async function handleCallback(cq) {
   }
   if (data.startsWith("ai:") && cq.from?.id) {
     return ai.handleCallback(cq, await ensureUser(cq.from, null));
+  }
+  if (data.startsWith("tr:")) {
+    return translate.handleCallback(cq);
   }
   if (data.startsWith("watch:") && cq.from?.id) {
     return watch.handleCallback(cq, await ensureUser(cq.from, null));

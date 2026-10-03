@@ -10,7 +10,8 @@ const TEXT = {
   km: {
     ask:
       "{:m_language:} បកប្រែភាសា\n\n" +
-      "ផ្ញើអត្ថបទដែលចង់បកប្រែមកខ្ញុំ — ខ្ញុំនឹងស្គាល់ភាសា ហើយបកអោយភ្លាម (ខ្មែរ ⇄ អង់គ្លេស ស្វ័យប្រវត្តិ)។",
+      "ផ្ញើអត្ថបទដែលចង់បកប្រែមកខ្ញុំ — ខ្ញុំនឹងស្គាល់ភាសា ហើយបកអោយភ្លាម (ខ្មែរ ⇄ អង់គ្លេស ស្វ័យប្រវត្តិ)។\n" +
+      "{:bulb:} ចុចប៊ូតុង 🇨🇳 🇹🇭 🇻🇳 ក្រោមលទ្ធផល ដើម្បីបកទៅភាសាផ្សេងទៀតភ្លាម។",
     working: "{:wait:} កំពុងបកប្រែ…",
     failed: "{:fail:} បកប្រែមិនបានទេ សូមសាកម្ដងទៀត។",
     inlineHint:
@@ -20,7 +21,8 @@ const TEXT = {
   en: {
     ask:
       "{:m_language:} Translate\n\n" +
-      "Send me the text you want translated — I'll detect the language and translate it automatically (Khmer ⇄ English).",
+      "Send me the text you want translated — I'll detect the language and translate it automatically (Khmer ⇄ English).\n" +
+      "{:bulb:} Tap the 🇨🇳 🇹🇭 🇻🇳 buttons under a result to translate it into another language too.",
     working: "{:wait:} Translating…",
     failed: "{:fail:} Couldn't translate that. Please try again.",
     inlineHint:
@@ -33,6 +35,23 @@ const TEXT = {
 // means the person taps the button again.
 const waiting = new Map();
 const WAIT_MS = 10 * 60_000;
+
+// The original text behind each "🇨🇳 🇹🇭 🇻🇳" button below a translation --
+// callback_data can't carry the text itself (Telegram's 64-byte limit), so a
+// short id stands in for it here instead, swept for staleness on insert.
+const pending = new Map(); // id -> { text, at }
+function remember(text) {
+  const cutoff = Date.now() - WAIT_MS;
+  for (const [id, e] of pending) if (e.at < cutoff) pending.delete(id);
+  const id = Math.random().toString(36).slice(2, 10);
+  pending.set(id, { text, at: Date.now() });
+  return id;
+}
+const MORE_LANGS = [
+  ["zh", "🇨🇳 中文"],
+  ["th", "🇹🇭 ไทย"],
+  ["vi", "🇻🇳 Tiếng Việt"],
+];
 
 let botName = null;
 async function botUsername() {
@@ -124,10 +143,34 @@ export async function handleText(chatId, user, text) {
   try {
     const toKm = await translateText(text, "km");
     const result = toKm.detected === "km" ? await translateText(text, "en") : toKm;
-    await call("sendMessage", { chat_id: chatId, text: result.translated || t.failed });
+    const id = remember(text);
+    await call("sendMessage", {
+      chat_id: chatId,
+      text: result.translated || t.failed,
+      reply_markup: { inline_keyboard: [MORE_LANGS.map(([code, label]) => ({ text: label, callback_data: `tr:${code}:${id}` }))] },
+    });
   } catch (err) {
     console.error("Translate failed:", err?.message ?? err);
     await call("sendMessage", { chat_id: chatId, text: t.failed });
+  }
+  return true;
+}
+
+/** A tap on 🇨🇳/🇹🇭/🇻🇳 under a translation: the same source text, that language. */
+export async function handleCallback(cq) {
+  const [, code, id] = String(cq?.data ?? "").split(":");
+  const entry = pending.get(id);
+  const chatId = cq.message?.chat?.id;
+  if (!entry || !chatId) {
+    await call("answerCallbackQuery", { callback_query_id: cq.id, text: "⌛", show_alert: false });
+    return true;
+  }
+  await call("answerCallbackQuery", { callback_query_id: cq.id });
+  try {
+    const { translated } = await translateText(entry.text, code);
+    await call("sendMessage", { chat_id: chatId, text: translated || "…" });
+  } catch (err) {
+    console.error("Translate (more languages) failed:", err?.message ?? err);
   }
   return true;
 }

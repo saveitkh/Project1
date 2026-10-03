@@ -83,6 +83,11 @@ export const config = {
   // day since it shares Gemini's one free quota with the rest of the bot.
   dubFreeDaily: int("DUB_FREE_DAILY", 3),
   dubVoice: str("DUB_VOICE", "km-KH-SreymomNeural"),
+  // Voice chat inside SaveIt AI (ai.js): send a voice note, get a transcribed
+  // reply from whichever chat model is picked, spoken back the same way.
+  // Transcription always goes through Gemini (like /dub), regardless of the
+  // chosen chat model, so it's capped per person per day on its own pool.
+  aiVoiceDaily: int("AI_VOICE_DAILY", 10),
 
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),

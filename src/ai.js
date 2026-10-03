@@ -26,6 +26,12 @@
  * fails. State (model, last few turns) is in memory on purpose: a restart
  * just starts a fresh conversation.
  */
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+
+import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
+
 import * as aiCredits from "./aiCredits.js";
 import { mainKeyboard } from "./botText.js";
 import { config } from "./config.js";
@@ -144,6 +150,7 @@ const TEXT = {
       `{:sparkle:} SaveIt AI\n${SEP}\n` +
       `💬 សួរអ្វីក៏បាន · សរសេរ · បកប្រែ · កូដ\n` +
       `👁 ផ្ញើរូបមក — AI មើល អាន ដោះស្រាយ\n` +
+      `🎙 ឬផ្ញើ Voice message — AI ស្ដាប់ ហើយឆ្លើយត្រឡប់ជាសំឡេង\n` +
       `🎨 «គូររូប…» — AI បង្កើតរូបភាព\n` +
       `🎵 «បង្កើតចម្រៀង…» — AI និពន្ធ និងច្រៀង\n` +
       `គ្រាន់តែសរសេរមក — AI យល់ខ្លួនឯងថាត្រូវឆ្លើយ គូរ ឬច្រៀង។\n\n` +
@@ -188,12 +195,16 @@ const TEXT = {
     noModels: "{:fail:} រក Model មិនឃើញទេ សូមសាកម្ដងទៀតបន្តិចទៀត។",
     noVision: "{:fail:} Model នេះមើលរូបភាពមិនបានទេ — ប្ដូរទៅ 🆓 Gemini Free, Claude, ChatGPT ឬ Gemini។",
     back: "{:ok:} ត្រឡប់មកម៉ឺនុយដើម។",
+    voiceOff: "{:fail:} ការជជែកដោយសំឡេងត្រូវការ Gemini API key — សរសេរជាអត្ថបទវិញបាន។",
+    voiceLimit: (n) => `{:fail:} ប្រើអស់ ${n} សារសំឡេងសម្រាប់ថ្ងៃនេះហើយ — សរសេរជាអត្ថបទវិញបាន។`,
+    voiceFailed: "{:fail:} ស្ដាប់សំឡេងមិនច្បាស់ទេ សូមសាកម្ដងទៀត ឬសរសេរជាអត្ថបទវិញ។",
   },
   en: {
     home: (models, using, free, paid) =>
       `{:sparkle:} SaveIt AI\n${SEP}\n` +
       `💬 Ask anything · write · translate · code\n` +
       `👁 Send a photo — the AI looks, reads, solves\n` +
+      `🎙 Or send a voice message — the AI listens and speaks back\n` +
       `🎨 "Draw…" — the AI makes a picture\n` +
       `🎵 "Make a song…" — the AI writes and sings it\n` +
       `Just write — the AI works out whether to answer, draw or sing.\n\n` +
@@ -237,6 +248,9 @@ const TEXT = {
     noModels: "{:fail:} Couldn't load the models. Please try again in a moment.",
     noVision: "{:fail:} This model can't see photos — switch to 🆓 Gemini Free, Claude, ChatGPT or Gemini.",
     back: "{:ok:} Back to the main menu.",
+    voiceOff: "{:fail:} Voice chat needs a Gemini API key — you can still type instead.",
+    voiceLimit: (n) => `{:fail:} You've used today's ${n} voice messages — you can still type instead.`,
+    voiceFailed: "{:fail:} Couldn't make out that audio. Please try again, or type instead.",
   },
 };
 
@@ -697,7 +711,7 @@ const TOOL_DEFS = (menu) => {
  * A message while in the AI. `photo` is the image's bytes when the message
  * carried one. Returns true when it handled the message.
  */
-export async function handleMessage(chatId, user, text, photo) {
+export async function handleMessage(chatId, user, text, photo, { speak = false } = {}) {
   const s = session(chatId);
   if (!s || (!text && !photo)) return false;
   const tx = t(user);
@@ -764,6 +778,9 @@ export async function handleMessage(chatId, user, text, photo) {
 
   if (reply.text) {
     for (const part of chunk(reply.text, 4000)) await call("sendMessage", { chat_id: chatId, text: part });
+    // Only when the question itself arrived as a voice note -- a typed chat
+    // never gets an unsolicited voice reply back.
+    if (speak) await sendSpeech(chatId, reply.text, lang(user)).catch((err) => console.error("AI voice reply failed:", err?.message ?? err));
   }
   const tool = reply.toolCalls[0];
   if (tool?.name === "create_image") {
@@ -779,6 +796,89 @@ export async function handleMessage(chatId, user, text, photo) {
     await call("sendMessage", { chat_id: chatId, text: tx.failed });
   }
   return true;
+}
+
+/**
+ * A voice note while in the AI: transcribed with Gemini (whatever chat model
+ * is picked stays picked -- only the listening step always uses Gemini, the
+ * same as /dub), then answered exactly like a typed message, with the reply
+ * also spoken back. Capped on its own free pool since it's an extra Gemini
+ * call the selected model's own tier/cost doesn't account for.
+ */
+export async function handleVoice(chatId, user, voice) {
+  if (!isActive(chatId)) return false;
+  const tx = t(user);
+  if (!config.geminiApiKey) {
+    await call("sendMessage", { chat_id: chatId, text: tx.voiceOff });
+    return true;
+  }
+  if (!takeFree(chatId, user.telegram_user_id, "voice", config.aiVoiceDaily)) {
+    await call("sendMessage", { chat_id: chatId, text: tx.voiceLimit(config.aiVoiceDaily) });
+    return true;
+  }
+  let transcript;
+  try {
+    const buffer = await telegramFile(voice.file_id);
+    transcript = await transcribeAudio(buffer, voice.mime_type || "audio/ogg");
+  } catch (err) {
+    console.error("AI voice transcribe failed:", err?.message ?? err);
+  }
+  if (!transcript) {
+    giveBackFree(user.telegram_user_id, "voice");
+    await call("sendMessage", { chat_id: chatId, text: tx.voiceFailed });
+    return true;
+  }
+  return handleMessage(chatId, user, transcript, null, { speak: true });
+}
+
+async function telegramFile(fileId) {
+  const info = await call("getFile", { file_id: fileId });
+  const filePath = info?.result?.file_path;
+  if (!filePath) throw new Error("Telegram did not return the file");
+  const res = await fetch(`https://api.telegram.org/file/bot${config.telegramLoginBotToken}/${filePath}`);
+  if (!res.ok) throw new Error(`downloading the voice note failed (${res.status})`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+/** Gemini listens and writes back exactly what was said, in its own script. */
+async function transcribeAudio(buffer, mimeType) {
+  const model = await geminiFreeModel();
+  const prompt =
+    "Transcribe the speech in this audio exactly as spoken, in its original language and script " +
+    "(Khmer speech becomes Khmer script, never romanized). Reply with only the transcript, nothing else.";
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(config.geminiApiKey)}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: mimeType, data: buffer.toString("base64") } }] }],
+      }),
+    }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data?.error?.message || `Gemini returned ${res.status}`);
+  return String(data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") ?? "").trim();
+}
+
+/** Speaks a reply back with a free Microsoft Edge neural voice (see /dub). */
+async function sendSpeech(chatId, text, language) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "ai-voice-"));
+  try {
+    const tts = new MsEdgeTTS();
+    const voice = language === "en" ? "en-US-AvaNeural" : config.dubVoice;
+    await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+    const { audioFilePath } = await tts.toFile(dir, text.slice(0, 2000));
+    const buffer = await fs.readFile(audioFilePath);
+    const form = new FormData();
+    form.set("chat_id", String(chatId));
+    form.set("audio", new Blob([buffer], { type: "audio/mpeg" }), "reply.mp3");
+    const res = await fetch(`https://api.telegram.org/bot${config.telegramLoginBotToken}/sendAudio`, { method: "POST", body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!data.ok) console.error("AI voice reply send failed:", JSON.stringify(data));
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 // ------------------------------------------------------------- providers
