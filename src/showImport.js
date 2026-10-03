@@ -69,8 +69,6 @@ export async function matchShows() {
   });
 }
 
-const short = (id) => String(id).slice(0, 8);
-
 /** A report of what /importshows apply would (and wouldn't) do. */
 export function summarize(matched) {
   const clean = matched.filter((m) => m.matches.length === 1);
@@ -82,10 +80,13 @@ export function summarize(matched) {
   for (const m of clean) lines.push(`   • ${m.show.title} → ${m.matches[0].title} (${m.matches[0].total_episodes ?? 0} ep)`);
 
   if (dupes.length) {
+    // Full ids on purpose, not shortened -- /mergetopic <keep> <drop> needs
+    // the real id, and a truncated one shown here is one the admin can't
+    // actually paste back in.
     lines.push("", `{:warn:} ឈ្មោះផ្គូផ្គងច្រើន topic (apply រំលង -- ប្រើ /mergetopic ដោយដៃសិន): ${dupes.length}`);
     for (const m of dupes) {
-      const parts = m.matches.map((x) => `${x.title} [${short(x.id)}, ${x.total_episodes ?? 0}ep]`).join(" + ");
-      lines.push(`   • ${m.show.title}: ${parts}`);
+      lines.push(`   • ${m.show.title}:`);
+      for (const x of m.matches) lines.push(`      - ${x.title} (${x.total_episodes ?? 0} ep) — ${x.id}`);
     }
   }
 
