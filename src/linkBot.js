@@ -25,6 +25,7 @@ import * as botJobs from "./botJobs.js";
 import * as botPay from "./botPay.js";
 import * as emojiMaker from "./emojiMaker.js";
 import * as khInvoice from "./khInvoice.js";
+import * as showImport from "./showImport.js";
 import * as translate from "./translate.js";
 import * as videoDub from "./videoDub.js";
 import * as voiceInsert from "./voiceInsert.js";
@@ -474,6 +475,12 @@ export async function handleMessage(message) {
  * (TELEGRAM_ADMIN_CHAT_ID). Returns true when it handled the message, so an
  * ordinary user typing /stats just falls through to the link handling.
  */
+// The last /importshows dry-run result, so /importshows apply commits
+// exactly what the admin reviewed rather than re-matching against
+// whatever either catalog looks like by the time apply is typed. One
+// admin chat in practice, so a module-level slot is enough.
+let lastShowImportMatch = null;
+
 async function handleAdminCommand(chatId, text) {
   if (!config.telegramAdminChatId || String(chatId) !== String(config.telegramAdminChatId)) return false;
 
@@ -645,6 +652,52 @@ async function handleAdminCommand(chatId, text) {
   if (setShow) {
     try {
       await send(chatId, await watch.setShow(setShow[1], setShow[2].toLowerCase(), setShow[3]?.toLowerCase(), setShow[4]));
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
+
+  // /importshows: dry-run name-matches Nintplex's catalog against this
+  // bot's own Telegram topics and reports what would change; the admin
+  // reviews that, then /importshows apply commits exactly what was shown
+  // (the cached result, not a fresh match -- so apply can't act on a
+  // different picture of the data than what was reviewed).
+  if (/^\/importshows\b/i.test(text)) {
+    const apply = /^\/importshows\s+apply$/i.test(text);
+    if (!apply) {
+      await send(chatId, "⏳ កំពុងផ្គូផ្គងឈ្មោះជាមួយ Nintplex…");
+      try {
+        const matched = await showImport.matchShows();
+        lastShowImportMatch = matched;
+        await sendLong(chatId, showImport.summarize(matched));
+        await send(chatId, "{:bulb:} វាយ /importshows apply ដើម្បីបញ្ចូល poster+ឈ្មោះសម្រាប់ផ្គូផ្គងច្បាស់ៗ។");
+      } catch (err) {
+        await send(chatId, `⚠️ ${err?.message ?? err}`);
+      }
+      return true;
+    }
+    if (!lastShowImportMatch) {
+      await send(chatId, "⚠️ រត់ /importshows (គ្មាន apply) ជាមុនសិន ដើម្បីមើលថាអ្វីនឹងផ្លាស់ប្ដូរ។");
+      return true;
+    }
+    await send(chatId, "⏳ កំពុងទាញ poster និងកំណត់ឈ្មោះ…");
+    try {
+      const result = await showImport.applyMatches(lastShowImportMatch);
+      lastShowImportMatch = null;
+      const lines = [`✅ បានបញ្ចូល ${result.ok}/${result.total} រឿង`];
+      if (result.failed) lines.push(`⚠️ បរាជ័យ ${result.failed}`, ...result.errors.slice(0, 10));
+      await sendLong(chatId, lines.join("\n"));
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
+
+  const mergeTopic = /^\/mergetopic\s+(\S+)\s+(\S+)$/i.exec(text);
+  if (mergeTopic) {
+    try {
+      await send(chatId, await watch.mergeTopic(mergeTopic[1], mergeTopic[2]));
     } catch (err) {
       await send(chatId, `⚠️ ${err?.message ?? err}`);
     }

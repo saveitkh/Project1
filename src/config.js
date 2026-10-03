@@ -89,6 +89,19 @@ export const config = {
   // chosen chat model, so it's capped per person per day on its own pool.
   aiVoiceDaily: int("AI_VOICE_DAILY", 10),
 
+  // Donghua in Khmer (watch.js) can borrow a show's title + poster from
+  // Nintplex's own catalog (showImport.js) -- a sibling product, its own
+  // Supabase project, totally separate from this bot's. The URL and this
+  // particular key are the ones baked into Nintplex's own public web app
+  // bundle already (an anon key with read-only access to one public
+  // table), not a secret of this bot's; still overridable in case either
+  // ever changes.
+  nintplexSupabaseUrl: str("NINTPLEX_SUPABASE_URL", "https://dowjxhkijtlsdvhyuddt.supabase.co"),
+  nintplexSupabaseAnonKey: str(
+    "NINTPLEX_SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvd2p4aGtpanRsc2R2aHl1ZGR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYyMjE3MTIsImV4cCI6MjEwMTc5NzcxMn0.ulxBnNG6fc6muqPrAxzEGw0VPyZpR5ug8bY713PyWGg"
+  ),
+
   telegramApiId: str("TELEGRAM_API_ID"),
   telegramApiHash: str("TELEGRAM_API_HASH"),
   telegramPhone: str("TELEGRAM_PHONE"),

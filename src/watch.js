@@ -31,7 +31,7 @@
  */
 import { mainKeyboard } from "./botText.js";
 import { config } from "./config.js";
-import { db, fetchAll, rows } from "./db.js";
+import { db, fetchAll, nowIso, rows } from "./db.js";
 import * as botDeliver from "./botDeliver.js";
 import * as customEmoji from "./customEmoji.js";
 import { call } from "./notifyBot.js";
@@ -923,6 +923,30 @@ export async function setShow(topicId, kind, status, credits, posterBuffer, post
   }
   const saved = await saveShowMeta(topicId, patch);
   return `✅ Show set: kind=${saved.kind} status=${saved.status} ep_credits=${saved.ep_credits}${posterBuffer ? " (poster emoji + photo added)" : ""}`;
+}
+
+/**
+ * Merges two topics that are really the same show (Telegram split it across
+ * two threads -- a re-upload, a continued season, whatever the reason):
+ * every episode of `dropId` moves under `keepId`, keep's total_episodes
+ * absorbs drop's, and drop is hidden from listings (🙈, the same on_sale
+ * flag the admin "hide show" button uses) rather than deleted, so nothing
+ * about it is lost if this turns out to be the wrong call.
+ */
+export async function mergeTopic(keepId, dropId) {
+  if (keepId === dropId) throw new Error("that's the same topic twice");
+  const [keep] = rows(await db().from("topics").select("id, title, total_episodes").eq("id", keepId).limit(1));
+  const [drop] = rows(await db().from("topics").select("id, title, total_episodes").eq("id", dropId).limit(1));
+  if (!keep) throw new Error(`no topic ${keepId}`);
+  if (!drop) throw new Error(`no topic ${dropId}`);
+
+  await db().from("episodes").update({ topic_id: keepId, updated_at: nowIso() }).eq("topic_id", dropId);
+  const combined = (keep.total_episodes ?? 0) + (drop.total_episodes ?? 0);
+  await db().from("topics").update({ total_episodes: combined, updated_at: nowIso() }).eq("id", keepId);
+  await db().from("topics").update({ total_episodes: 0, updated_at: nowIso() }).eq("id", dropId);
+  await saveShowMeta(dropId, { on_sale: false });
+
+  return `✅ Merged "${drop.title}" (${drop.total_episodes ?? 0} ep) into "${keep.title}" -- now ${combined} ep total. "${drop.title}" is hidden (🙈), not deleted.`;
 }
 
 /** /shows -- topic index for /setshow, across every registered group. */
