@@ -99,6 +99,7 @@ const GROQ_FREE = {
 
 // The AI keyboard's non-model buttons, both languages (a tap arrives as text).
 const BUTTONS = {
+  models: { km: "🤖 ជ្រើសរើស Model", en: "🤖 Choose a Model", emoji: "ai_badge" },
   image: { km: "🎨 បង្កើតរូបភាព", en: "🎨 Create image", emoji: null },
   song: { km: "🎵 បង្កើតចម្រៀង", en: "🎵 Create song", emoji: "ai_elevenlabs" },
   new: { km: "🔄 ចាប់ផ្ដើមថ្មី", en: "🔄 New chat", emoji: null },
@@ -204,6 +205,7 @@ const TEXT = {
     noModels: "{:fail:} រក Model មិនឃើញទេ សូមសាកម្ដងទៀតបន្តិចទៀត។",
     noVision: "{:fail:} Model នេះមើលរូបភាពមិនបានទេ — ប្ដូរទៅ 🆓 Gemini Free, Claude, ChatGPT ឬ Gemini។",
     back: "{:ok:} ត្រឡប់មកម៉ឺនុយដើម។",
+    pickModel: "{:ai_badge:} ជ្រើសរើស Model — ចុចមួយខាងក្រោម៖",
     voiceOff: "{:fail:} ការជជែកដោយសំឡេងត្រូវការ Gemini API key — សរសេរជាអត្ថបទវិញបាន។",
     voiceLimit: (n) => `{:fail:} ប្រើអស់ ${n} សារសំឡេងសម្រាប់ថ្ងៃនេះហើយ — សរសេរជាអត្ថបទវិញបាន។`,
     voiceFailed: "{:fail:} ស្ដាប់សំឡេងមិនច្បាស់ទេ សូមសាកម្ដងទៀត ឬសរសេរជាអត្ថបទវិញ។",
@@ -257,6 +259,7 @@ const TEXT = {
     noModels: "{:fail:} Couldn't load the models. Please try again in a moment.",
     noVision: "{:fail:} This model can't see photos — switch to 🆓 Gemini Free, Claude, ChatGPT or Gemini.",
     back: "{:ok:} Back to the main menu.",
+    pickModel: "{:ai_badge:} Choose a Model — tap one below:",
     voiceOff: "{:fail:} Voice chat needs a Gemini API key — you can still type instead.",
     voiceLimit: (n) => `{:fail:} You've used today's ${n} voice messages — you can still type instead.`,
     voiceFailed: "{:fail:} Couldn't make out that audio. Please try again, or type instead.",
@@ -429,14 +432,14 @@ function giveBackFree(userId, provider) {
 function aiKeyboard(menu, user) {
   const l = lang(user);
   const btn = (text, emoji) => ({ text, ...(emoji ? { emoji } : {}) });
-  const chatMenu = chatModels(menu);
-  const chats = chatMenu.map((m) => btn(m.label, m.emoji));
   const rows = [];
-  // Every free model gets a row of its own at the top: the ones anyone can
-  // use, before the paid ones start pairing up.
-  let i = 0;
-  while (i < chatMenu.length && chatMenu[i].tier === "free") rows.push([chats[i++]]);
-  for (; i < chats.length; i += 2) rows.push(chats.slice(i, i + 2));
+  // Every chat model used to get its own row (or a pair) here -- eight-plus
+  // buttons tall on a phone, the thing people kept saying was cluttered and
+  // hard to use. One launcher button now opens them instead, as an inline
+  // picker under its own message (see modelPickerKeyboard) -- fewer rows on
+  // screen, and its icon ({:ai_badge:}) already loops through every logo on
+  // its own, which a static keyboard button never could.
+  rows.push([btn(BUTTONS.models[l], BUTTONS.models.emoji)]);
   const tools = [];
   if (imageModel(menu)) tools.push(btn(BUTTONS.image[l], BUTTONS.image.emoji));
   if (menu.some((m) => m.song)) tools.push(btn(BUTTONS.song[l], BUTTONS.song.emoji));
@@ -449,6 +452,22 @@ function aiKeyboard(menu, user) {
   rows.push([btn(BUTTONS.new[l]), btn(BUTTONS.credit[l], BUTTONS.credit.emoji)]);
   rows.push([btn(BUTTONS.menu[l])]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
+}
+
+/** Every chat model as inline buttons -- free ones get a row of their own. */
+function modelPickerKeyboard(menu) {
+  const chatMenu = chatModels(menu);
+  const btn = (m) => ({
+    text: m.label,
+    ...(m.emoji ? { emoji: m.emoji } : {}),
+    ...(m.tier === "free" ? { style: "success" } : {}),
+    callback_data: `ai:m:${m.key}`,
+  });
+  const rows = [];
+  let i = 0;
+  while (i < chatMenu.length && chatMenu[i].tier === "free") rows.push([btn(chatMenu[i++])]);
+  for (; i < chatMenu.length; i += 2) rows.push(chatMenu.slice(i, i + 2).map(btn));
+  return { inline_keyboard: rows };
 }
 
 // A tap on the AI keyboard arrives as its label -- or, once a logo icon
@@ -572,6 +591,10 @@ export async function handleButton(chatId, user, text) {
   }
   if (key === "credit") {
     await aiCredits.showTopUps(chatId, user).catch((err) => console.error("AI Credit screen failed:", err?.message ?? err));
+    return true;
+  }
+  if (key === "models") {
+    await call("sendMessage", { chat_id: chatId, text: tx.pickModel, reply_markup: modelPickerKeyboard(menu) });
     return true;
   }
   if (key === "new") {
