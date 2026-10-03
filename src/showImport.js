@@ -43,6 +43,28 @@ async function allTopics() {
   return rows(await db().from("topics").select("id, title, total_episodes").order("title"));
 }
 
+/** Writes one Nintplex show's poster + title onto one Telegram topic. */
+async function applyOne(show, topicId) {
+  const res = await fetch(show.poster_url);
+  if (!res.ok) throw new Error(`poster fetch ${res.status}`);
+  const buffer = Buffer.from(await res.arrayBuffer());
+  await watch.setPoster(topicId, buffer, null);
+  await db().from("topics").update({ title: show.title }).eq("id", topicId);
+}
+
+/**
+ * For the shows /importshows couldn't auto-match (different wording between
+ * Nintplex and this bot's own Telegram library): a free-text search over
+ * Nintplex's catalog, so an admin who recognizes the show by eye can pick it
+ * by hand -- see /matchshow.
+ */
+export async function searchNintplexShows(query) {
+  const nintplex = await fetchNintplexShows();
+  const n = normalize(query);
+  if (!n) return [];
+  return nintplex.filter((show) => normalize(show.title).includes(n));
+}
+
 /**
  * Every Nintplex show, each with the Telegram topic(s) whose title matches
  * it (normalized equality first, then a containment fallback for slightly
@@ -106,12 +128,7 @@ export async function applyMatches(matched) {
   const errors = [];
   for (const { show, matches } of clean) {
     try {
-      const res = await fetch(show.poster_url);
-      if (!res.ok) throw new Error(`poster fetch ${res.status}`);
-      const buffer = Buffer.from(await res.arrayBuffer());
-      const topicId = matches[0].id;
-      await watch.setPoster(topicId, buffer, null);
-      await db().from("topics").update({ title: show.title }).eq("id", topicId);
+      await applyOne(show, matches[0].id);
       ok += 1;
     } catch (err) {
       failed += 1;
@@ -123,4 +140,9 @@ export async function applyMatches(matched) {
     await new Promise((resolve) => setTimeout(resolve, PAUSE_MS));
   }
   return { ok, failed, total: clean.length, errors };
+}
+
+/** /matchshow's single pick: write one chosen Nintplex show onto one topic. */
+export async function applyManualMatch(show, topicId) {
+  await applyOne(show, topicId);
 }

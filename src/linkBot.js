@@ -481,6 +481,12 @@ export async function handleMessage(message) {
 // admin chat in practice, so a module-level slot is enough.
 let lastShowImportMatch = null;
 
+// The last /matchshow search that came back with more than one candidate,
+// so the admin can narrow it with /matchshow <topic_id> #<n> instead of
+// retyping a more specific search term. Same one-admin-chat reasoning as
+// lastShowImportMatch above.
+let lastManualSearch = null;
+
 async function handleAdminCommand(chatId, text) {
   if (!config.telegramAdminChatId || String(chatId) !== String(config.telegramAdminChatId)) return false;
 
@@ -698,6 +704,52 @@ async function handleAdminCommand(chatId, text) {
   if (mergeTopic) {
     try {
       await send(chatId, await watch.mergeTopic(mergeTopic[1], mergeTopic[2]));
+    } catch (err) {
+      await send(chatId, `⚠️ ${err?.message ?? err}`);
+    }
+    return true;
+  }
+
+  // /matchshow: for the shows /importshows couldn't auto-match (different
+  // wording between Nintplex and this bot's own library), a manual pick --
+  // search by eye, apply by hand. "#<n>" picks from the previous search's
+  // numbered list instead of a fresh search, since >1 hit is the normal
+  // case once two catalogs disagree on wording.
+  const matchShowPick = /^\/matchshow\s+(\S+)\s+#(\d+)$/i.exec(text);
+  const matchShowSearch = /^\/matchshow\s+(\S+)\s+(.+)$/i.exec(text);
+  if (matchShowPick || matchShowSearch) {
+    const topicId = (matchShowPick ?? matchShowSearch)[1];
+    try {
+      let show;
+      if (matchShowPick) {
+        const n = Number(matchShowPick[2]);
+        if (!lastManualSearch?.length || !Number.isInteger(n) || n < 1 || n > lastManualSearch.length) {
+          await send(chatId, "⚠️ គ្មានលទ្ធផលស្វែងរកនោះទេ ឬលេខខុស -- វាយ /matchshow <topic_id> <ឈ្មោះ> ម្ដងទៀត។");
+          return true;
+        }
+        show = lastManualSearch[n - 1];
+      } else {
+        const query = matchShowSearch[2].trim();
+        await send(chatId, `⏳ កំពុងស្វែងរក "${query}" ក្នុង Nintplex…`);
+        const found = await showImport.searchNintplexShows(query);
+        if (!found.length) {
+          lastManualSearch = null;
+          await send(chatId, "{:fail:} រកមិនឃើញក្នុង Nintplex ទេ -- សាកល្បងពាក្យផ្សេង។");
+          return true;
+        }
+        if (found.length > 1) {
+          lastManualSearch = found;
+          const lines = [`{:warn:} រកឃើញ ${found.length} រឿង -- ជ្រើសរើសដោយ /matchshow ${topicId} #<លេខ>`, ""];
+          found.forEach((s, i) => lines.push(`${i + 1}. ${s.title}`));
+          await sendLong(chatId, lines.join("\n"));
+          return true;
+        }
+        show = found[0];
+      }
+      await send(chatId, `⏳ កំពុងដាក់ "${show.title}"…`);
+      await showImport.applyManualMatch(show, topicId);
+      lastManualSearch = null;
+      await send(chatId, `✅ បានដាក់ poster+ឈ្មោះ "${show.title}" ទៅ topic ${topicId}`);
     } catch (err) {
       await send(chatId, `⚠️ ${err?.message ?? err}`);
     }
