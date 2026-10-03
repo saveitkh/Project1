@@ -6,20 +6,23 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet" />
-    <link rel="manifest" href="/invoice/manifest.webmanifest" />
-    <link rel="icon" type="image/png" href="/invoice/icon-192.png" />
-    <link rel="apple-touch-icon" href="/invoice/apple-touch-icon.png" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" type="image/png" href="./icon-192.png" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <meta name="theme-color" content="#0C447C" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="KH Invoice" />
     <title>KH Invoice</title>
-    <!-- Telegram Mini App API: harmless in a browser, and inside the SaveIt KH
-         bot it hands us the signed initData used to sign in automatically. -->
+    <!-- Telegram Mini App API: harmless in a plain browser, and inside the
+         SaveIt KH bot it's what would hand this app the signed initData for
+         signing in automatically -- see DEEP_LINK_SCREENS in src/App.tsx for
+         the other half of that bot integration (?screen=... routing, which
+         this one already uses). -->
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script type="module" crossorigin src="/invoice/assets/index-D40faqdu.js"></script>
-    <link rel="stylesheet" crossorigin href="/invoice/assets/index-C32_R4kx.css">
+    <script type="module" crossorigin src="./assets/index-C9Lz7udH.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-D5RUS5cs.css">
   </head>
   <body>
     <div id="root"></div>

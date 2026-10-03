@@ -150,19 +150,22 @@ export function mainKeyboard(language) {
     return { text: item[language] ?? item.en, emoji: item.emoji, ...(item.style ? { style: item.style } : {}) };
   };
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
-  // The dashboard, top to bottom: the AI headline, Manage Business right
-  // under it (the operator's own daily tool), then pairs grouped by what
-  // they're for -- downloading, watching & words, your account -- with the
-  // colour on the one button of each pair people tap most. History, language
-  // and help live under Account; Open App closes the list.
-  const rows = [
-    [button("ai")],
-    ...(config.khInvoiceBridgeSecret ? [[button("invoice"), button("emoji")]] : [[button("emoji")]]),
+  // The dashboard, top to bottom: Manage Business now leads -- the
+  // operator's own daily tool, swapped into SaveIt AI's old headline spot --
+  // with the AI one row down, in Manage Business's old spot; then pairs
+  // grouped by what they're for -- downloading, watching & words, your
+  // account -- with the colour on the one button of each pair people tap
+  // most. History, language and help live under Account; Open App closes
+  // the list.
+  const rows = config.khInvoiceBridgeSecret
+    ? [[button("invoice")], [button("ai"), button("emoji")]]
+    : [[button("ai")], [button("emoji")]];
+  rows.push(
     [button("free"), button("premium")],
     [button("watch"), button("translate")],
     [button("buy"), button("account")],
     [button("referral")],
-  ];
+  );
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }

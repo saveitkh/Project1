@@ -51,10 +51,13 @@ app.use(
 );
 
 /**
- * The KH Invoice web app (webapps/kh-invoice, built with base /invoice/),
- * served here so the bot's Mini App buttons have an https page on the same
- * deployment. Hashed assets are cached for good; index.html never is, so a
- * new build shows up on the next open.
+ * The KH Invoice web app (webapps/kh-invoice -- the saveitkh/Khinvoce- repo's
+ * own `npm run build` output, copied in as-is: its vite.config.ts uses a
+ * relative base so the same build works mounted here under /invoice/ or
+ * served from a domain's root, no post-build patching needed), served here
+ * so the bot's Mini App buttons have an https page on the same deployment.
+ * Hashed assets are cached for good; index.html never is, so a new build
+ * shows up on the next open.
  */
 const KH_INVOICE_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "webapps", "kh-invoice");
 app.use(

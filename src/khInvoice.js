@@ -190,6 +190,9 @@ const L = {
     kSummary: "📋 សង្ខេបថ្ងៃនេះ",
     kShop: "🏪 ឈ្មោះហាង",
     kStock: "📦 ស្តុកទំនិញ",
+    kCustomer: "👥 អតិថិជន",
+    kSupplierDebt: "🤝 បំណុលអ្នកផ្គត់ផ្គង់",
+    kCategory: "🏷 ប្រភេទចំណូល/ចំណាយ",
     kBack: "⬅️ ម៉ឺនុយដើម",
     backDone: "{:inv_back:} ត្រឡប់ទៅម៉ឺនុយដើម",
     createHint: "{:inv_create:} ចុចប៊ូតុងខាងក្រោម ដើម្បីបើកផ្ទាំងបង្កើតវិក្កយបត្រ (ចូលដោយស្វ័យប្រវត្តិ)៖",
@@ -201,6 +204,8 @@ const L = {
     aReport: "📊 របាយការណ៍",
     aStock: "📦 ស្តុក",
     aCustomer: "👥 អតិថិជន",
+    aSupplierDebt: "🤝 បំណុលអ្នកផ្គត់ផ្គង់",
+    aCategory: "🏷 ប្រភេទចំណូល/ចំណាយ",
     aDebt: "💳 បំណុល",
     aHome: "🏠 ទំព័រដើម",
     askShop: (current) => `{:inv_shop:} វាយឈ្មោះហាងរបស់អ្នក (បង្ហាញលើវិក្កយបត្រ)${current ? `\nបច្ចុប្បន្ន៖ ${current}` : ""}`,
@@ -265,6 +270,9 @@ const L = {
     kSummary: "📋 Today's summary",
     kShop: "🏪 Shop name",
     kStock: "📦 Stock",
+    kCustomer: "👥 Customers",
+    kSupplierDebt: "🤝 Supplier debts",
+    kCategory: "🏷 Categories",
     kBack: "⬅️ Main menu",
     backDone: "{:inv_back:} Back to the main menu",
     createHint: "{:inv_create:} Tap below to open the new-invoice screen (signed in automatically):",
@@ -276,6 +284,8 @@ const L = {
     aReport: "📊 Report",
     aStock: "📦 Stock",
     aCustomer: "👥 Customers",
+    aSupplierDebt: "🤝 Supplier debts",
+    aCategory: "🏷 Categories",
     aDebt: "💳 Debts",
     aHome: "🏠 Home",
     askShop: (current) => `{:inv_shop:} Type your shop name (shown on invoices)${current ? `\nNow: ${current}` : ""}`,
@@ -347,10 +357,13 @@ export function sectionKeyboard(language) {
       [{ text: t.income, emoji: "inv_in", style: "success" }, { text: t.expense, emoji: "inv_out", style: "danger" }],
       [{ text: t.kSummary, emoji: "inv_summary" }, { text: t.aReport, emoji: "inv_report" }],
       [{ text: t.kStock, emoji: "inv_stock" }, { text: t.unpaid, emoji: "inv_unpaid" }],
-      [{ text: t.kShop, emoji: "inv_shop" }, { text: t.kOpen, emoji: "inv_app" }],
-      // 6 rows total: a 7th pushed "back" below the visible keyboard on a
-      // phone screen (Telegram doesn't scroll a reply keyboard into view).
-      [{ text: t.buy, emoji: "inv_pro", style: "primary" }, { text: t.kBack, emoji: "inv_back" }],
+      // Customer directory and supplier debts: the app has had these screens
+      // for a while (CustomerScreen.tsx/SupplierDebtScreen.tsx), but nothing
+      // in the bot ever linked to them -- this is that missing link.
+      [{ text: t.kCustomer }, { text: t.kSupplierDebt }],
+      [{ text: t.kCategory }, { text: t.kShop, emoji: "inv_shop" }],
+      [{ text: t.kOpen, emoji: "inv_app" }, { text: t.buy, emoji: "inv_pro", style: "primary" }],
+      [{ text: t.kBack, emoji: "inv_back" }],
     ],
     resize_keyboard: true,
     is_persistent: true,
@@ -368,6 +381,9 @@ for (const lang of Object.keys(L)) {
     [t.kCreate, "create"], [t.kOpen, "open"], [t.income, "income"], [t.expense, "expense"],
     [t.kSummary, "summary"], [t.unpaid, "unpaid"], [t.kShop, "shop"], [t.buy, "buy"], [t.kBack, "back"],
     [t.kStock, "stock"], [t.aReport, "report"], [t.aStock, "stock"],
+    [t.kCustomer, "customer"], [t.aCustomer, "customer"],
+    [t.kSupplierDebt, "supplierdebt"], [t.aSupplierDebt, "supplierdebt"],
+    [t.kCategory, "category"], [t.aCategory, "category"],
   ]) {
     SECTION_ACTIONS.set(label, action);
     SECTION_ACTIONS.set(bare(label), action);
@@ -420,6 +436,9 @@ export async function handleSectionButton(chatId, user, text, backToMenu) {
   else if (action === "open") await showAppScreen(chatId, user, t.open, undefined, "inv_app", t.appHint);
   else if (action === "report") await showAppScreen(chatId, user, t.aReport, "report", "inv_report", t.appHint);
   else if (action === "stock") await showAppScreen(chatId, user, t.aStock, "stock", "inv_stock", t.stockHint);
+  else if (action === "customer") await showAppScreen(chatId, user, t.aCustomer, "customer", undefined, t.appHint);
+  else if (action === "supplierdebt") await showAppScreen(chatId, user, t.aSupplierDebt, "supplierdebt", undefined, t.appHint);
+  else if (action === "category") await showAppScreen(chatId, user, t.aCategory, "category", undefined, t.appHint);
   else if (action === "income" || action === "expense") {
     awaiting.set(chatId, { kind: "entry", type: action, at: Date.now() });
     await call("sendMessage", { chat_id: chatId, text: t.askAmount(action) });
