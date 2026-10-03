@@ -14,8 +14,15 @@ import path from "node:path";
 import { config } from "./config.js";
 import { db, rows, telegramSettings } from "./db.js";
 import { withFloodRetry } from "./floodRetry.js";
+import { isCopyRefused } from "./forwarder.js";
 import { mediaInfo } from "./scanner.js";
 import { getClient, listAccounts, normalizeChatId, resolveEntity } from "./telegram.js";
+
+// Not imported from downloader.js's own safeFilename: that module imports
+// storeMessage() from this one, and a cycle is one risk not worth taking for
+// one regex.
+const ILLEGAL_IN_FILENAME = /[<>:"/\\|?*\u0000-\u001f]/g;
+const safeFilename = (name) => ((name || "").replace(ILLEGAL_IN_FILENAME, "_").replace(/^[\s.]+|[\s.]+$/g, "") || "video.mp4").slice(0, 120);
 
 /**
  * A connected account that can see both the source group and the storage
@@ -59,18 +66,50 @@ export async function storeMessage(sourceChatId, messageId) {
   const storageChatId = normalizeChatId(conf.storageChatId);
   const { client, sourceEntity, storageEntity } = await clientForBoth(sourceChatId, storageChatId);
 
-  const sent = await withFloodRetry(
-    () => client.forwardMessages(storageEntity, { messages: [Number(messageId)], fromPeer: sourceEntity }),
-    { label: `telegram-storage forward ${sourceChatId}/${messageId}` }
-  );
-  const first = Array.isArray(sent) ? sent[0] : sent;
-  if (!first?.id) {
-    throw new Error(
-      "Telegram would not copy this message into the storage channel -- likely content protection on the source group."
+  try {
+    const sent = await withFloodRetry(
+      () => client.forwardMessages(storageEntity, { messages: [Number(messageId)], fromPeer: sourceEntity }),
+      { label: `telegram-storage forward ${sourceChatId}/${messageId}` }
     );
+    const first = Array.isArray(sent) ? sent[0] : sent;
+    if (!first?.id) throw new Error("Telegram did not confirm the forward.");
+    return { chatId: String(storageChatId), messageId: first.id };
+  } catch (err) {
+    if (!isCopyRefused(err)) throw err;
+    // Content protection on the source group: Telegram will never copy this
+    // by reference, forever, no matter how many accounts are tried -- the
+    // only way to get the file into storage is to download it and upload it
+    // again, the same fallback forwarder.js already uses for protected
+    // groups elsewhere in this bot.
+    return reuploadToStorage({ client, sourceEntity, storageEntity, storageChatId, messageId });
   }
+}
 
-  return { chatId: String(storageChatId), messageId: first.id };
+/** Downloads the source message's video and uploads it fresh into storage. */
+async function reuploadToStorage({ client, sourceEntity, storageEntity, storageChatId, messageId }) {
+  const found = await withFloodRetry(() => client.getMessages(sourceEntity, { ids: Number(messageId) }), {
+    label: `telegram-storage getMessages ${messageId}`,
+  });
+  const message = Array.isArray(found) ? found[0] : found;
+  if (!message?.media) throw new Error("This message no longer has any media to store.");
+
+  await fsp.mkdir(config.downloadDir, { recursive: true });
+  const info = mediaInfo(message);
+  const localPath = path.join(config.downloadDir, `tgstore-reupload-${messageId}-${safeFilename(info?.fileName || "video.mp4")}`);
+  try {
+    await withFloodRetry(() => client.downloadMedia(message, { outputFile: localPath }), {
+      label: `telegram-storage download ${messageId} for re-upload`,
+    });
+    const sent = await withFloodRetry(
+      () => client.sendFile(storageEntity, { file: localPath, caption: message.message || "", supportsStreaming: true, forceDocument: false }),
+      { label: `telegram-storage re-upload ${messageId}` }
+    );
+    const first = Array.isArray(sent) ? sent[0] : sent;
+    if (!first?.id) throw new Error("Telegram did not confirm the upload.");
+    return { chatId: String(storageChatId), messageId: first.id };
+  } finally {
+    await fsp.rm(localPath, { force: true }).catch(() => {});
+  }
 }
 
 /**

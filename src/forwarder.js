@@ -28,7 +28,7 @@ const COPY_REFUSED = [
   "FILE_REFERENCE_",
 ];
 
-const isCopyRefused = (err) => {
+export const isCopyRefused = (err) => {
   const text = String(err?.errorMessage ?? err?.message ?? "");
   return COPY_REFUSED.some((code) => text.includes(code));
 };
