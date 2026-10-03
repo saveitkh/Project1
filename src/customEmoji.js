@@ -95,6 +95,9 @@ export const EMOJI = {
   ai_badge: ["ai_badge", "🤖"],
   ai_grok: ["ai_grok", "🛰️"],
   ai_deepseek: ["ai_deepseek", "🐋"],
+  // Donghua in Khmer (watch.js) -- a spinning badge of the library's own
+  // character art, the same idea as ai_badge above.
+  donghua_badge: ["donghua_badge", "🎬"],
 };
 
 // {:name:} is one of EMOJI; {:1234...:} is any custom emoji by its id (one a

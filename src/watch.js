@@ -152,7 +152,7 @@ const SEP = "━━━━━━━━━━━━━━";
 const L = {
   km: {
     home: (credits) =>
-      `{:video:} រឿងនិយាយខ្មែរ (សម្រាប់លក់)\n${SEP}\n` +
+      `{:donghua_badge:} Donghua និយាយខ្មែរ (សម្រាប់លក់)\n${SEP}\n` +
       `{:m_account:} Credit របស់អ្នក៖ ${credits}\n` +
       `{:credit:} 1 ភាគ = 1 Credit ($${DEFAULT_PRICE_USD.toFixed(2)})\n${SEP}\n` +
       `{:bulb:} ជ្រើសរើសប្រភេទរឿងខាងក្រោម៖`,
@@ -209,7 +209,7 @@ const L = {
   },
   en: {
     home: (credits) =>
-      `{:video:} Khmer-dubbed Shows (for sale)\n${SEP}\n` +
+      `{:donghua_badge:} Donghua in Khmer (for sale)\n${SEP}\n` +
       `{:m_account:} Your Credit: ${credits}\n` +
       `{:credit:} 1 episode = 1 Credit ($${DEFAULT_PRICE_USD.toFixed(2)})\n${SEP}\n` +
       `{:bulb:} Pick a genre below:`,

@@ -51,13 +51,18 @@ const MENU = [
   },
   {
     action: "watch",
-    emoji: "video",
+    emoji: "donghua_badge",
     style: "danger",
-    km: "🎬 រឿងនិយាយខ្មែរ",
-    en: "🎬 Khmer-dubbed Shows",
+    km: "🎬 Donghua និយាយខ្មែរ",
+    en: "🎬 Donghua in Khmer",
     // The "(for sale)" clarifier lives in the section's own home text now --
-    // it made the main-menu button wrap to two lines on a phone.
-    aliases: ["🎬 មើលរឿង", "🎬 រឿងនិយាយខ្មែរ (សម្រាប់លក់)", "🎬 Khmer-dubbed Shows (for sale)", "🎬 Watch"],
+    // it made the main-menu button wrap to two lines on a phone. Older
+    // labels (before the rename, and before the icon replaced the leading
+    // emoji) stay as aliases so a keyboard still on someone's screen works.
+    aliases: [
+      "🎬 មើលរឿង", "🎬 រឿងនិយាយខ្មែរ", "🎬 រឿងនិយាយខ្មែរ (សម្រាប់លក់)",
+      "🎬 Khmer-dubbed Shows", "🎬 Khmer-dubbed Shows (for sale)", "🎬 Watch",
+    ],
   },
   { action: "emoji", emoji: "sparkle", km: "✨ Emoji Maker", en: "✨ Emoji Maker", aliases: ["✨ Emoji Maker · បង្កើត Emoji"] },
   {
@@ -267,7 +272,7 @@ const TEXT = {
       `      {:yt:} {:fb:} {:ig:} {:tt:} {:x:}\n\n` +
       `{:m_pro:} Telegram ឯកជន — ក្រុម/channel បិទ\n` +
       `      {:gift:} សាកល្បងឥតគិតថ្លៃ 10 វីដេអូ\n\n` +
-      `{:video:} រឿងនិយាយខ្មែរ · {:m_language:} បកប្រែ · {:sparkle:} Emoji Maker\n` +
+      `{:donghua_badge:} Donghua និយាយខ្មែរ · {:m_language:} បកប្រែ · {:sparkle:} Emoji Maker\n` +
       `${SEP}\n` +
       `{:bulb:} ផ្ញើតំណវីដេអូមក ឬជ្រើសប៊ូតុងខាងក្រោម {:dl:}`,
     help:
@@ -376,7 +381,7 @@ const TEXT = {
       `      {:yt:} {:fb:} {:ig:} {:tt:} {:x:}\n\n` +
       `{:m_pro:} Private Telegram — closed groups/channels\n` +
       `      {:gift:} 10 videos free to try\n\n` +
-      `{:video:} Khmer-dubbed shows · {:m_language:} Translate · {:sparkle:} Emoji Maker\n` +
+      `{:donghua_badge:} Donghua in Khmer · {:m_language:} Translate · {:sparkle:} Emoji Maker\n` +
       `${SEP}\n` +
       `{:bulb:} Send a video link, or pick a button below {:dl:}`,
     help:
