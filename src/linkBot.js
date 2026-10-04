@@ -363,6 +363,12 @@ export async function handleMessage(message) {
     }
     case "app":
       return send(chatId, config.webAppUrl ? t.openApp(config.webAppUrl) : t.openAppMissing);
+    case "dubbing":
+      return config.dubbingStudioUrl
+        ? send(chatId, t.dubbingOpen, {
+            reply_markup: { inline_keyboard: [[{ text: t.dubbingButton, web_app: { url: config.dubbingStudioUrl } }]] },
+          })
+        : send(chatId, t.dubbingMissing);
     default:
       break;
   }
@@ -649,6 +655,7 @@ function commandAction(text) {
     case "/referral": return "referral";
     case "/language": return "language";
     case "/app": return "app";
+    case "/dubbing": return "dubbing";
     case "/buy": return "buy";
     case "/free": return "free";
     case "/premium": return "premium";

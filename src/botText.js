@@ -89,6 +89,14 @@ const MENU = [
   { action: "language", emoji: "m_language", km: "🌐 ភាសា", en: "🌐 Language" },
   { action: "help", emoji: "m_help", km: "❓ ជំនួយ", en: "❓ Help", aliases: ["❓ របៀបប្រើ", "❓ How to use"] },
   {
+    action: "dubbing",
+    emoji: "video",
+    style: "primary",
+    km: "🎬 បញ្ចូលសំឡេងខ្មែរ (AI Dubbing)",
+    en: "🎬 AI Khmer Dubbing",
+    aliases: ["🎬 Dubbing Studio"],
+  },
+  {
     action: "app",
     emoji: "app_tg",
     km: "📲 Open App",
@@ -143,6 +151,9 @@ export function mainKeyboard(language) {
     [button("buy")],
     [button("referral")],
   ];
+  // A plain button: the bot answers with an inline Mini App button, because only an
+  // inline-opened Mini App receives the signed initData the studio logs people in with.
+  if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
@@ -200,6 +211,9 @@ const TEXT = {
     btnHelp: "❓ ជំនួយ",
     openApp: (url) => `{:m_desktop:} បើកកម្មវិធីពេញលេញ៖\n${url}`,
     openAppMissing: "{:m_desktop:} កម្មវិធីលើបណ្ដាញមិនទាន់បានកំណត់ទេ។",
+    dubbingOpen: "{:video:} AI បញ្ចូលសំឡេងខ្មែរ — Upload វីដេអូ ស្កេន បកប្រែ ហើយបង្កើតវីដេអូនិយាយខ្មែរ៖",
+    dubbingButton: "🎬 បើក Dubbing Studio",
+    dubbingMissing: "{:video:} Dubbing Studio មិនទាន់បានដាក់ដំណើរការទេ។",
     sendLink: "{:dl:} ផ្ញើតំណវីដេអូមកទីនេះ (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…)។",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — ឥតគិតថ្លៃ មិនកំណត់\n\n` +
@@ -305,6 +319,9 @@ const TEXT = {
     btnHelp: "❓ Help",
     openApp: (url) => `{:m_desktop:} Open the full app:\n${url}`,
     openAppMissing: "{:m_desktop:} The web app URL isn't configured yet.",
+    dubbingOpen: "{:video:} AI Khmer dubbing — upload a video, scan, translate and get it back speaking Khmer:",
+    dubbingButton: "🎬 Open Dubbing Studio",
+    dubbingMissing: "{:video:} The Dubbing Studio isn't deployed yet.",
     sendLink: "{:dl:} Send a video link here (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…).",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — free & unlimited\n\n` +
