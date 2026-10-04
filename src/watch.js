@@ -27,7 +27,9 @@
  * these just carry the "watch_" id prefix instead of none, and grant Watch
  * Credit instead of paid_downloads. One episode costs a show's own
  * ep_credits (default 1); the $1-for-4 tier prices that at $0.25 each, the
- * number asked for.
+ * number asked for. A brand-new account starts with WATCH_FREE_CREDITS
+ * (config.js, default 10) instead of 0, so a first-time user can unlock an
+ * episode before ever topping up.
  */
 import { mainKeyboard } from "./botText.js";
 import { config } from "./config.js";
@@ -128,7 +130,11 @@ async function wallets() {
 }
 async function walletFor(userId) {
   const all = await wallets();
-  return all[userId] ?? { credits: 0, bought: {} };
+  // New account, never seen before: starts with WATCH_FREE_CREDITS so a
+  // first-time user can unlock an episode before ever topping up. Not
+  // persisted here -- the first purchase() or grantTopUp() call saves the
+  // real balance, so this default is only ever handed out once per user.
+  return all[userId] ?? { credits: config.watchFreeCredits, bought: {} };
 }
 async function saveWallet(userId, entry) {
   const all = await wallets();

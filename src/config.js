@@ -60,6 +60,9 @@ export const config = {
     }),
   aiFreeDaily: int("AI_FREE_DAILY", 5),
   aiCosts: str("AI_COSTS"),
+  // One-time Watch Credit a brand-new account starts with (watch.js), so a
+  // first-time user can unlock an episode before ever topping up.
+  watchFreeCredits: int("WATCH_FREE_CREDITS", 10),
   aiSongSeconds: int("AI_SONG_SECONDS", 120),
   // 🆓 Gemini Free: Google's own free Gemini API tier (a key from
   // aistudio.google.com), costing no AI Credit. Google's free quota is per
