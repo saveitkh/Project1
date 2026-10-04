@@ -151,8 +151,9 @@ export function mainKeyboard(language) {
     [button("buy")],
     [button("referral")],
   ];
-  // The dubbing studio opens inside Telegram as a Mini App when it is deployed
-  if (config.dubbingStudioUrl) rows.push([{ ...button("dubbing"), web_app: { url: config.dubbingStudioUrl } }]);
+  // A plain button: the bot answers with an inline Mini App button, because only an
+  // inline-opened Mini App receives the signed initData the studio logs people in with.
+  if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }

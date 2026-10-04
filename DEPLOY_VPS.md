@@ -74,6 +74,17 @@ DUBBING_STUDIO_URL=https://dub.184-174-38-113.sslip.io/
 
 បន្ទាប់មក ក្នុង Bot ចុច /start ម្តងទៀត ដើម្បីឃើញប៊ូតុងថ្មី។
 
+## ៦ក. Login ស្វ័យប្រវត្តតាម Telegram
+
+នៅពេលបើក Studio ពី Bot (ប៊ូតុង «🎬 បញ្ចូលសំឡេងខ្មែរ» → «🎬 បើក Dubbing Studio») Studio នឹង **Login ដោយខ្លួនឯង** ជាមួយគណនី Telegram ដោយមិនបាច់វាយពាក្យសម្ងាត់ទេ។ ចូលលើកដំបូង គណនីនឹងត្រូវបង្កើតដោយស្វ័យប្រវត្ត។
+
+ការកំណត់៖
+- ក្នុង `.env`៖ `TELEGRAM_LOGIN_BOT_TOKEN=` (Token របស់ Bot ដដែល)
+- ក្នុង `.env.studio`៖ `STUDIO_TELEGRAM_ADMIN_IDS=` (Telegram ID របស់អ្នក ដើម្បីបានសិទ្ធិ Admin។ រកមើល ID តាម @userinfobot)
+- ចង់អនុញ្ញាតតែគណនីដែលមានស្រាប់ៗ៖ `STUDIO_TELEGRAM_SIGNUP=0`
+
+បន្ទាប់ពីកែ៖ `docker compose up -d`
+
 ## ៧. Update
 
 ```bash

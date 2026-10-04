@@ -19,6 +19,8 @@ services:
     environment:
       - PORT=3000
       - STUDIO_PUBLIC_MODE=1
+      # Telegram auto-login: same bot token the bot uses (TELEGRAM_LOGIN_BOT_TOKEN in .env)
+      - STUDIO_TELEGRAM_BOT_TOKEN=${TELEGRAM_LOGIN_BOT_TOKEN:-}
     volumes:
       - studio_data:/app/data
       - studio_uploads:/app/uploads
