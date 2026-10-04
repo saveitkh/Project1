@@ -1,0 +1,70 @@
+# VPS deployment: the Khmer AI Dubbing Studio (opened from the bot as a Mini App)
+# behind automatic HTTPS. Telegram only opens https Mini Apps; the free sslip.io
+# names below resolve to the VPS IP, so no domain has to be bought.
+#
+#   cp .env.studio.example .env.studio   # GEMINI_API_KEY, STUDIO_ADMIN_PASSWORD
+#   docker compose up -d --build         # studio + https
+#   docker compose --profile bot up -d --build   # ALSO run this bot here (see below)
+#
+# Then set DUBBING_STUDIO_URL=https://<STUDIO_HOST>/ wherever the bot runs.
+services:
+  studio:
+    # Built straight from the studio's GitHub repo; set STUDIO_GIT_REF=main once merged
+    build:
+      context: https://github.com/saveitkh/BarameyDabber.git#${STUDIO_GIT_REF:-claude/affectionate-noether-yvzenh}
+    container_name: dubbing-studio
+    restart: unless-stopped
+    env_file:
+      - .env.studio
+    environment:
+      - PORT=3000
+      - STUDIO_PUBLIC_MODE=1
+    volumes:
+      - studio_data:/app/data
+      - studio_uploads:/app/uploads
+      - studio_outputs:/app/outputs
+      - studio_samples:/app/samples
+    expose:
+      - "3000"
+
+  # The bot/userbot service from this repo. Opt-in (--profile bot): run it here only if
+  # it is NOT also running on Railway -- two copies of the userbot fight over the
+  # Telegram session and the webhook.
+  bot:
+    profiles: ["bot"]
+    build: .
+    container_name: saveit-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - PUBLIC_URL=https://${BOT_HOST:-bot.localhost}
+      - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2
+    container_name: vps-https
+    restart: unless-stopped
+    depends_on:
+      - studio
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - STUDIO_HOST=${STUDIO_HOST:?Set STUDIO_HOST, e.g. dub.184-174-38-113.sslip.io}
+      - BOT_HOST=${BOT_HOST:-bot.localhost}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  studio_data:
+  studio_uploads:
+  studio_outputs:
+  studio_samples:
+  caddy_data:
+  caddy_config:
