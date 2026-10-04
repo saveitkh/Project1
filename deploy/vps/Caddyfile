@@ -1,3 +1,12 @@
 {$DOMAIN} {
 	reverse_proxy app:8000
 }
+
+# Khmer AI Dubbing Studio (saveitkh/BarameyDabber), run as a separate
+# container and joined to this stack's network by hand -- see
+# docs/DEPLOY_VPS.md. STUDIO_HOST defaults to a .localhost name so this
+# block is inert (no ACME attempt, no error) until it's set in .env.
+{$STUDIO_HOST:dubbing-studio.localhost} {
+	encode gzip
+	reverse_proxy dubbing-studio:3000
+}

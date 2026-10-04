@@ -20,6 +20,9 @@ services:
       - "443:443"
     environment:
       DOMAIN: ${DOMAIN}
+      # Hostname for the Dubbing Studio site block in Caddyfile (see
+      # docs/DEPLOY_VPS.md) -- the block is inert until this is set.
+      STUDIO_HOST: ${STUDIO_HOST:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
