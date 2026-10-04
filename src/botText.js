@@ -104,6 +104,15 @@ const MENU = [
   // one resolves to an action the same way every other button does.
   { action: "dub", emoji: "video", km: "🎬 ប្ដូរវីដេអូជាខ្មែរ", en: "🎬 Dub video to Khmer" },
   { action: "redub", km: "🎙 ប្ដូរសំឡេងជារបស់អ្នក", en: "🎙 Replace voice with mine" },
+  // The full dubbing studio (a Mini App on the VPS) -- character voices, subtitles,
+  // background music -- for whole episodes rather than one short clip.
+  {
+    action: "dubbing",
+    emoji: "video",
+    km: "🎞 Studio បញ្ចូលសំឡេងខ្មែរ",
+    en: "🎞 Khmer Dubbing Studio",
+    aliases: ["🎬 បញ្ចូលសំឡេងខ្មែរ (AI Dubbing)", "🎬 AI Khmer Dubbing", "🎬 Dubbing Studio"],
+  },
   // Kept for the commands and older keyboards; now reached from Account.
   { action: "history", emoji: "m_history", km: "📜 ប្រវត្តិ", en: "📜 History" },
   { action: "language", emoji: "m_language", km: "🌐 ភាសា", en: "🌐 Language" },
@@ -171,6 +180,9 @@ export function mainKeyboard(language) {
     [button("buy"), button("account")],
     [button("referral")],
   );
+  // A plain button: the bot answers with an inline Mini App button, because only an
+  // inline-opened Mini App receives the signed initData the studio logs people in with.
+  if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
@@ -216,9 +228,13 @@ function aiIntro(language) {
  * startup). Khmer for Khmer-language Telegram apps, English otherwise.
  */
 export const BOT_COMMANDS = {
+  // Grouped by what people come for: AI first, then video, then the rest.
   km: [
     ["start", "🏠 ម៉ឺនុយដើម"],
-    ["ai", "🤖 SaveIt AI"],
+    ["ai", "🤖 SaveIt AI — សួរអ្វីក៏បាន"],
+    ["image", "🎨 បង្កើតរូបភាព"],
+    ["song", "🎵 បង្កើតចម្រៀង"],
+    ["newchat", "🔄 ចាប់ផ្ដើមការសន្ទនា AI ថ្មី"],
     ["gemini_free", "🆓 Gemini ឥតគិតថ្លៃ"],
     ["llama_free", "🆓 Llama ឥតគិតថ្លៃ"],
     ["claude", "🧠 Claude"],
@@ -227,20 +243,28 @@ export const BOT_COMMANDS = {
     ["flash", "🚀 Gemini Flash"],
     ["grok", "🛰 Grok"],
     ["deepseek", "🐋 DeepSeek"],
-    ["image", "🎨 បង្កើតរូបភាព"],
-    ["song", "🎵 បង្កើតចម្រៀង"],
-    ["newchat", "🔄 ចាប់ផ្ដើមការសន្ទនា AI ថ្មី"],
-    ["ai_credit", "💳 AI Credit · ទិញបន្ថែម"],
-    ["free", "⬇️ ទាញយកវីដេអូ"],
+    ["dub", "🎬 ប្ដូរវីដេអូខ្លីជាខ្មែរ"],
+    ["redub", "🎙 ប្ដូរសំឡេងវីដេអូជារបស់អ្នក"],
+    ["dubbing", "🎞 Studio បញ្ចូលសំឡេង (រឿងពេញ)"],
+    ["free", "⬇️ ទាញយកវីដេអូ (YouTube, TikTok…)"],
+    ["premium", "👑 ទាញយកពី Telegram ឯកជន"],
+    ["watch", "📺 មើល Donghua និយាយខ្មែរ"],
     ["translate", "🌐 បកប្រែភាសា"],
-    ["dub", "🎬 ប្រែវីដេអូជាខ្មែរ"],
-    ["redub", "🎙 ប្ដូរសំឡេងជារបស់អ្នក"],
+    ["emoji", "✨ បង្កើត Emoji"],
+    ["ai_credit", "💳 AI Credit · ទិញបន្ថែម"],
+    ["buy", "💲 បញ្ចូល Credit ទាញយក"],
+    ["referral", "🎁 ណែនាំមិត្ត · ទទួល Credit"],
     ["account", "👤 គណនី"],
+    ["history", "📜 ប្រវត្តិទាញយក"],
+    ["language", "🌐 ប្ដូរភាសា"],
     ["help", "❓ ជំនួយ"],
   ],
   en: [
     ["start", "🏠 Main menu"],
-    ["ai", "🤖 SaveIt AI"],
+    ["ai", "🤖 SaveIt AI — ask anything"],
+    ["image", "🎨 Create image"],
+    ["song", "🎵 Create song"],
+    ["newchat", "🔄 New AI chat"],
     ["gemini_free", "🆓 Free Gemini"],
     ["llama_free", "🆓 Free Llama"],
     ["claude", "🧠 Claude"],
@@ -249,15 +273,20 @@ export const BOT_COMMANDS = {
     ["flash", "🚀 Gemini Flash"],
     ["grok", "🛰 Grok"],
     ["deepseek", "🐋 DeepSeek"],
-    ["image", "🎨 Create image"],
-    ["song", "🎵 Create song"],
-    ["newchat", "🔄 New AI chat"],
-    ["ai_credit", "💳 AI Credit · buy more"],
-    ["free", "⬇️ Download videos"],
+    ["dub", "🎬 Dub a short video to Khmer"],
+    ["redub", "🎙 Replace a video's voice with mine"],
+    ["dubbing", "🎞 Dubbing Studio (full episodes)"],
+    ["free", "⬇️ Download videos (YouTube, TikTok…)"],
+    ["premium", "👑 Download from private Telegram"],
+    ["watch", "📺 Watch Donghua in Khmer"],
     ["translate", "🌐 Translate"],
-    ["dub", "🎬 Dub video to Khmer"],
-    ["redub", "🎙 Replace voice with mine"],
+    ["emoji", "✨ Emoji Maker"],
+    ["ai_credit", "💳 AI Credit · buy more"],
+    ["buy", "💲 Add download Credit"],
+    ["referral", "🎁 Invite friends · get Credit"],
     ["account", "👤 Account"],
+    ["history", "📜 Download history"],
+    ["language", "🌐 Language"],
     ["help", "❓ Help"],
   ],
 };
@@ -310,6 +339,12 @@ const TEXT = {
     btnHelp: "❓ ជំនួយ",
     openApp: (url) => `{:m_desktop:} បើកកម្មវិធីពេញលេញ៖\n${url}`,
     openAppMissing: "{:m_desktop:} កម្មវិធីលើបណ្ដាញមិនទាន់បានកំណត់ទេ។",
+    dubbingOpen:
+      "{:video:} Studio បញ្ចូលសំឡេងខ្មែរ — សម្រាប់វីដេអូវែង/រឿងពេញ\n" +
+      "Upload វីដេអូ → AI ស្កេន បកប្រែ ចែកតួ → សំឡេងខ្មែរ ក្លូនសំឡេងតួ Subtitle និងភ្លេង។\n" +
+      "(វីដេអូខ្លី? ប្រើ /dub ក្នុង Chat នេះបានភ្លាម)",
+    dubbingButton: "🎞 បើក Studio",
+    dubbingMissing: "{:video:} Studio បញ្ចូលសំឡេងមិនទាន់បើកដំណើរការទេ — សាក /dub សម្រាប់វីដេអូខ្លី។",
     sendLink: "{:dl:} ផ្ញើតំណវីដេអូមកទីនេះ (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…)។",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — ឥតគិតថ្លៃ មិនកំណត់\n\n` +
@@ -419,6 +454,12 @@ const TEXT = {
     btnHelp: "❓ Help",
     openApp: (url) => `{:m_desktop:} Open the full app:\n${url}`,
     openAppMissing: "{:m_desktop:} The web app URL isn't configured yet.",
+    dubbingOpen:
+      "{:video:} Khmer Dubbing Studio — for long videos and full episodes\n" +
+      "Upload a video → AI scans, translates and casts it → Khmer voices, cloned character voices, subtitles and music.\n" +
+      "(Short clip? Use /dub right here in the chat)",
+    dubbingButton: "🎞 Open Studio",
+    dubbingMissing: "{:video:} The dubbing studio isn't running yet — try /dub for short clips.",
     sendLink: "{:dl:} Send a video link here (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…).",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — free & unlimited\n\n` +

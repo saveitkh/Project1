@@ -123,6 +123,9 @@ export const config = {
   // here, and only opens it as a Mini App when the same URL is registered
   // with @BotFather -- otherwise the button is simply a link.
   webAppUrl: str("WEB_APP_URL"),
+  // The Khmer AI dubbing studio (separate Python service, see docker-compose.yml),
+  // opened as a Mini App from /dubbing. Must be https. Unset = no button, no command.
+  dubbingStudioUrl: str("DUBBING_STUDIO_URL"),
   // KH Invoice, the separate invoicing app the bot also fronts (see
   // khInvoice.js). The bridge is that app's telegram-bridge edge function;
   // the secret is the one stored in its bridge_config row. The web URL is

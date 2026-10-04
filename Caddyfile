@@ -1,0 +1,13 @@
+# Automatic HTTPS (Let's Encrypt) for the services on this VPS
+
+# Khmer AI Dubbing Studio
+{$STUDIO_HOST} {
+	encode gzip
+	reverse_proxy studio:3000
+}
+
+# This bot's web service (only answers when started with --profile bot)
+{$BOT_HOST} {
+	encode gzip
+	reverse_proxy bot:8000
+}

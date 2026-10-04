@@ -1062,7 +1062,10 @@ async function registerBotWebhook() {
   }
   // What Telegram lists when someone types "/" -- the AI's models among them.
   for (const [language, list] of Object.entries(BOT_COMMANDS)) {
-    const commands = list.map(([command, description]) => ({ command, description }));
+    const commands = list
+      // /dubbing only once the studio is deployed (DUBBING_STUDIO_URL)
+      .filter(([command]) => command !== "dubbing" || config.dubbingStudioUrl)
+      .map(([command, description]) => ({ command, description }));
     await botApi("setMyCommands", { commands, ...(language === "en" ? {} : { language_code: language }) }).catch(() => null);
   }
   // The button beside the message box: the native "/" command list (so
