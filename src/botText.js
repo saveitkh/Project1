@@ -164,26 +164,31 @@ export function mainKeyboard(language) {
     return { text: item[language] ?? item.en, emoji: item.emoji, ...(item.style ? { style: item.style } : {}) };
   };
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret && config.publicUrl ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");
-  // The dashboard, top to bottom: Manage Business now leads -- the
-  // operator's own daily tool, swapped into SaveIt AI's old headline spot --
-  // with the AI one row down, in Manage Business's old spot; then pairs
-  // grouped by what they're for -- downloading, watching & words, your
-  // account -- with the colour on the one button of each pair people tap
-  // most. History, language and help live under Account; Open App closes
-  // the list.
-  const rows = config.khInvoiceBridgeSecret
-    ? [[button("invoice")], [button("ai"), button("emoji")]]
-    : [[button("ai")], [button("emoji")]];
+  // Telegram only hands signed initData (what the studio logs people in with) to a
+  // Mini App opened from an *inline* button -- a reply-keyboard web_app button like
+  // "app" below never receives it, so if WEB_APP_URL was pointed at the same studio,
+  // that button would always land on the login screen. Never show both for one URL.
+  const appUrlIsStudio = Boolean(
+    appUrl && config.dubbingStudioUrl && appUrl.replace(/\/$/, "") === config.dubbingStudioUrl.replace(/\/$/, "")
+  );
+  // The dashboard, top to bottom: the Dubbing Studio leads when it's configured --
+  // the button people actually came for -- then Manage Business (the operator's own
+  // daily tool), with AI one row down; then pairs grouped by what they're for --
+  // downloading, watching & words, your account -- with the colour on the one button
+  // of each pair people tap most. History, language and help live under Account;
+  // Open App closes the list.
+  const rows = [];
+  // A plain button: the bot answers with an inline Mini App button, because only an
+  // inline-opened Mini App receives the signed initData the studio logs people in with.
+  if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
+  rows.push(...(config.khInvoiceBridgeSecret ? [[button("invoice")], [button("ai"), button("emoji")]] : [[button("ai")], [button("emoji")]]));
   rows.push(
     [button("free"), button("premium")],
     [button("watch"), button("translate")],
     [button("buy"), button("account")],
     [button("referral")],
   );
-  // A plain button: the bot answers with an inline Mini App button, because only an
-  // inline-opened Mini App receives the signed initData the studio logs people in with.
-  if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
-  if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
+  if (appUrl && !appUrlIsStudio) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
 
