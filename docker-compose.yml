@@ -35,8 +35,8 @@ services:
       - studio_samples:/app/samples
     expose:
       - "3000"
-    depends_on:
-      - voxcpm
+    # No depends_on on voxcpm: `up -d studio` must not restart the CPU VoxCPM2 when the studio
+    # uses a Colab GPU (VOXCPM_URL). Without VoxCPM2 the studio falls back to the plain Khmer voice.
 
   # VoxCPM2 2.0.3 voice cloning on the VPS CPU, with the Khmer voice bank.
   # First start downloads the model (~5 GB) into voxcpm_models; it needs ~8 GB RAM.
