@@ -62,6 +62,12 @@ docker compose --profile dubber-bot up -d --build dubber-bot
 docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
 ```
 
+**Emoji Studio ក្នុង bot ដដែល** (មិនត្រូវការការកំណត់បន្ថែម)៖
+- ផ្ញើ **រូប · GIF · វីដេអូ · Sticker** → ចូលកញ្ចប់ Emoji ផ្ទាល់ខ្លួន (`t.me/addemoji/…`) + ទទួលឯកសារគ្រប់ទម្រង់ (PNG 512 ថ្លា, WebP, PNG 100, WebM 100, GIF)។
+- `/coding` → ឈុត 26 icon **Coding & Terminal** (`>_` `{ }` `</>` bug, git, ✓ ✗, API, SQL…) ជា ៤ ធៀម (Terminal / Neon / Dracula / Light) ជាកញ្ចប់ Emoji + **ZIP** សម្រាប់ប្រើក្នុង project ផ្សេង (README, Discord, Slack)។
+- `/badge npm run dev` (ឬ `/badge dracula git push`) → Badge ស្ទីល Terminal ពីអក្សរ។
+- ប្រើ Emoji ក្នុងសារ ត្រូវការ Telegram Premium របស់អ្នកប្រើ; ឯកសារ PNG/GIF ប្រើបានគ្រប់ទីកន្លែង។ ត្រូវមាន `ffmpeg` (មានក្នុង Docker image រួចហើយ)។
+
 - **Logo**៖ ក្នុង @BotFather → `/setuserpic` → ជ្រើស Bot → ផ្ញើរូប (`public/app_logo.png` ក្នុង BarameyDabber)។
 - ចង់បានប៊ូតុង «ជំនួយ»៖ ដាក់ `DUBBER_SUPPORT_URL=https://t.me/<username>` ក្នុង `.env`។
 - Bot ម្នាក់ប្រើ token តែមួយ — កុំដំណើរការ `dubber-bot` ពីរកន្លែងព្រមគ្នា។
