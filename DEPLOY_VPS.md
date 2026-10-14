@@ -71,6 +71,7 @@ docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
 - **Logo**៖ ក្នុង @BotFather → `/setuserpic` → ជ្រើស Bot → ផ្ញើរូប (`public/app_logo.png` ក្នុង BarameyDabber)។
 - ចង់បានប៊ូតុង «ជំនួយ»៖ ដាក់ `DUBBER_SUPPORT_URL=https://t.me/<username>` ក្នុង `.env`។
 - Bot ម្នាក់ប្រើ token តែមួយ — កុំដំណើរការ `dubber-bot` ពីរកន្លែងព្រមគ្នា។
+- Studio ទទួល Login ពី Bot ទាំង `DUBBER_BOT_TOKEN` និង `TELEGRAM_LOGIN_BOT_TOKEN`។ បើអេក្រង់ Login ថា «Token របស់ Server (Bot ID …) មិនដូច Bot ដែលបើក» មានន័យថា `DUBBER_BOT_TOKEN` ក្នុង `.env` ទទេ ឬខុស — ដាក់ token របស់ Bot ដែលអ្នកបើកកម្មវិធីពីវា រួច `docker compose up -d --force-recreate studio`។
 - បើបង្ហាញ `token revoked` មានន័យថា token ត្រូវបាន /revoke — ដាក់ token ថ្មី ហើយ restart។
 
 ## Update
