@@ -83,7 +83,7 @@ docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
 |---|---|
 | ល្បឿន | CPU យឺត (ប្រហែល ១០–៦០ វិនាទី/ឃ្លា អាស្រ័យលើ CPU)។ វីដេអូបង្កើតនៅខាងក្រោយ — បិទ App បាន ហើយមើលក្នុងផ្ទាំង "វីដេអូ" ពេលក្រោយ |
 | RAM | ត្រូវការ ~8GB (ឬ swap)។ បើ voxcpm ត្រូវបានសម្លាប់ដោយខ្វះ RAM, studio ប្រើសំឡេងខ្មែរ AI ធម្មតាជំនួស |
-| លឿនជាងដោយ GPU | បើក `voxcpm_server/VoxCPM2_Khmer_5Voices_Colab.ipynb` (BarameyDabber) លើ Colab T4 → ដាក់ `VOXCPM_URL=https://….trycloudflare.com` ក្នុង `.env` → `docker compose up -d studio` |
+| លឿនជាងដោយ GPU | ប្រើ `voxcpm_server/VoxCPM2_Colab_Server.ipynb` (BarameyDabber) លើ Colab GPU → ដាក់ `VOXCPM_URL=https://….trycloudflare.com` និង `VOXCPM_API_KEY=<កូដសម្ងាត់ដូចគ្នា>` ក្នុង `.env` → `docker compose up -d studio` (មើលជំហានពេញក្នុងចម្លើយ ឬ README) |
 | គុណភាព/ល្បឿន | `VOXCPM_TIMESTEPS=10` ក្នុង `.env` (ច្រើន = ច្បាស់ជាង តែយឺត) |
 | ធនាគារសំឡេង | Admin បន្ថែម/លុបសំឡេងក្នុងផ្ទាំង **សំឡេង** នៃ App (ឈ្មោះ `ភេទ-អាយុ-លេខ` ឧ. `male-old-1`) |
 
