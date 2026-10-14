@@ -43,7 +43,7 @@ cd "$APP_DIR"
 
 say "Settings"
 touch .env
-[ -f .env.studio ] || { cp .env.studio.example .env.studio; warn "Created .env.studio — fill GEMINI_API_KEY and STUDIO_ADMIN_PASSWORD, then run this script again."; }
+[ -f .env.studio ] || { cp .env.studio.example .env.studio; warn "Created .env.studio — fill GEMINI_API_KEY and STUDIO_TELEGRAM_ADMIN_IDS, then run this script again."; }
 set_env() { # key value file — add or replace
   if grep -q "^$1=" "$3"; then sed -i "s|^$1=.*|$1=$2|" "$3"; else echo "$1=$2" >> "$3"; fi
 }
@@ -51,9 +51,14 @@ grep -q '^STUDIO_HOST=' .env || set_env STUDIO_HOST dub.184-174-38-113.sslip.io 
 grep -q '^BOT_HOST=' .env || set_env BOT_HOST bot.184-174-38-113.sslip.io .env
 set_env STUDIO_GIT_REF "$STUDIO_REF" .env
 grep -q '^VOXCPM_API_KEY=.\+' .env || set_env VOXCPM_API_KEY "$(openssl rand -hex 24)" .env
-if ! grep -q '^STUDIO_ADMIN_PASSWORD=.\+' .env.studio; then
-  warn "STUDIO_ADMIN_PASSWORD is empty in $APP_DIR/.env.studio — the studio refuses to start without it."
-  exit 1
+if ! grep -q '^STUDIO_TELEGRAM_ADMIN_IDS=.\+' .env.studio; then
+  warn "STUDIO_TELEGRAM_ADMIN_IDS is empty in $APP_DIR/.env.studio — nobody will be admin. Put your Telegram id there (ask @userinfobot)."
+fi
+if grep -q '^STUDIO_PASSWORD_LOGIN=1' .env.studio && ! grep -q '^STUDIO_ADMIN_PASSWORD=.\+' .env.studio; then
+  warn "STUDIO_PASSWORD_LOGIN=1 needs STUDIO_ADMIN_PASSWORD in $APP_DIR/.env.studio."; exit 1
+fi
+if ! grep -q '^DUBBER_BOT_TOKEN=.\+' .env && ! grep -q '^TELEGRAM_LOGIN_BOT_TOKEN=.\+' .env; then
+  warn "No bot token in $APP_DIR/.env (DUBBER_BOT_TOKEN) — people cannot sign in."
 fi
 
 say "Firewall"

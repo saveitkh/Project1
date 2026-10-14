@@ -21,7 +21,9 @@ services:
       - PORT=3000
       - STUDIO_PUBLIC_MODE=1
       # Telegram auto-login: same bot token the bot uses (TELEGRAM_LOGIN_BOT_TOKEN in .env)
-      - STUDIO_TELEGRAM_BOT_TOKEN=${TELEGRAM_LOGIN_BOT_TOKEN:-}
+      # (DUBBER_BOT_TOKEN wins so the bot that opens the app and the login check never disagree)
+      - STUDIO_TELEGRAM_BOT_TOKEN=${DUBBER_BOT_TOKEN:-${TELEGRAM_LOGIN_BOT_TOKEN:-}}
+      - STUDIO_BOT_USERNAME=${DUBBER_BOT_USERNAME:-}
       # Voice cloning runs in the voxcpm container below (private network only).
       # VOXCPM_URL in .env can point at the Colab GPU notebook instead (faster).
       - VOXCPM_API_URL=${VOXCPM_URL:-http://voxcpm:8000}
@@ -78,7 +80,7 @@ services:
     restart: unless-stopped
     command: ["node", "src/dubberBot.js"]
     environment:
-      - DUBBER_BOT_TOKEN=${DUBBER_BOT_TOKEN:?Set DUBBER_BOT_TOKEN in .env}
+      - DUBBER_BOT_TOKEN=${DUBBER_BOT_TOKEN:-}
       - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
       - DUBBER_SUPPORT_URL=${DUBBER_SUPPORT_URL:-}
     profiles: ["dubber-bot"]

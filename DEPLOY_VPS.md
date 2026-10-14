@@ -28,7 +28,7 @@ Script នេះ៖ ពិនិត្យ RAM/Disk (បន្ថែម swap 8GB 
 
 ```bash
 ssh root@184.174.38.113
-nano /root/Project1/.env.studio   # GEMINI_API_KEY, STUDIO_ADMIN_PASSWORD (ពាក្យសម្ងាត់វែងៗ), STUDIO_TELEGRAM_ADMIN_IDS
+nano /root/Project1/.env.studio   # GEMINI_API_KEY, STUDIO_TELEGRAM_ADMIN_IDS=<Telegram ID របស់អ្នក> (គ្មានពាក្យសម្ងាត់ទៀតទេ)
 nano /root/Project1/.env          # TELEGRAM_LOGIN_BOT_TOKEN= (Token Bot ដដែល)
 ```
 
@@ -84,5 +84,5 @@ docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
 ## សុវត្ថិភាព
 
 - **ប្ដូរពាក្យសម្ងាត់ root របស់ VPS** បន្ទាប់ពីដាក់រួច (`passwd`) ហើយប្រើ SSH key ជំនួសពាក្យសម្ងាត់ល្អជាង។
-- `STUDIO_ADMIN_PASSWORD` ត្រូវវែង និងមិនប្រើកន្លែងផ្សេង។
+- **ចូលតាម Telegram តែប៉ុណ្ណោះ** — គ្មានទំព័រពាក្យសម្ងាត់ទេ។ Admin = Telegram ID ក្នុង `STUDIO_TELEGRAM_ADMIN_IDS` (ដក ID ចេញ → បាត់សិទ្ធិពេល Login ក្រោយ)។ ទិន្នន័យ Login ត្រូវផ្ទៀងផ្ទាត់ដោយ HMAC ជាមួយ token របស់ bot។
 - **១ គណនី = ១ ឧបករណ៍**៖ Login ក្នុង Telegram នឹងចាកចេញពី Browser ផ្សេង។
