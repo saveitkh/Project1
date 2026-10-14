@@ -70,6 +70,19 @@ services:
     expose:
       - "8000"
 
+  # The small "Khmer Dubber" bot (its own BotFather token): /start -> button that opens the
+  # Mini App. Long polling, so it needs no public URL and never clashes with the other bot.
+  dubber-bot:
+    build: .
+    container_name: dubber-bot
+    restart: unless-stopped
+    command: ["node", "src/dubberBot.js"]
+    environment:
+      - DUBBER_BOT_TOKEN=${DUBBER_BOT_TOKEN:?Set DUBBER_BOT_TOKEN in .env}
+      - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
+      - DUBBER_SUPPORT_URL=${DUBBER_SUPPORT_URL:-}
+    profiles: ["dubber-bot"]
+
   caddy:
     image: caddy:2
     container_name: vps-https

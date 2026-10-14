@@ -50,6 +50,23 @@ DUBBING_STUDIO_URL=https://dub.184-174-38-113.sslip.io/
 
 ⚠️ ចង់ដំណើរការ Bot លើ VPS នេះដែរ (`docker compose --profile bot up -d --build`) បាន **លុះត្រាតែបិទ Bot នៅលើ Railway សិន** — Bot ពីរប្រជែង Telegram session គ្នា។
 
+## Bot ថ្មី «Khmer Dubber» (ជំនួសប៊ូតុងក្នុង Bot ចាស់)
+
+Bot តូចមួយដាច់ដោយឡែក (`src/dubberBot.js`)៖ `/start` → សារស្វាគមន៍ខ្មែរ + ប៊ូតុង **🎬 បើក Khmer Dubber** + «របៀបប្រើ» ហើយមានប៊ូតុង Menu «🎬 Dubber» ក្នុង chat។ វាកំណត់ឈ្មោះ/ការពិពណ៌នា/Commands ដោយខ្លួនឯងពេលចាប់ផ្ដើម។
+
+```bash
+cd /root/Project1
+nano .env     # DUBBER_BOT_TOKEN=<token> និង TELEGRAM_LOGIN_BOT_TOKEN=<token ដដែល>
+docker compose up -d studio                      # ឲ្យ Studio ទទួលស្គាល់ token ថ្មី
+docker compose --profile dubber-bot up -d --build dubber-bot
+docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
+```
+
+- **Logo**៖ ក្នុង @BotFather → `/setuserpic` → ជ្រើស Bot → ផ្ញើរូប (`public/app_logo.png` ក្នុង BarameyDabber)។
+- ចង់បានប៊ូតុង «ជំនួយ»៖ ដាក់ `DUBBER_SUPPORT_URL=https://t.me/<username>` ក្នុង `.env`។
+- Bot ម្នាក់ប្រើ token តែមួយ — កុំដំណើរការ `dubber-bot` ពីរកន្លែងព្រមគ្នា។
+- បើបង្ហាញ `token revoked` មានន័យថា token ត្រូវបាន /revoke — ដាក់ token ថ្មី ហើយ restart។
+
 ## Update
 
 រត់ពាក្យបញ្ជា `ssh … 'bash -s' < scripts/deploy_vps.sh` ដដែល។ វីដេអូ គណនី និងសំឡេងក្នុងធនាគាររក្សាក្នុង Docker volumes មិនបាត់ទេ។ ពេល branch ត្រូវបាន merge ចូល `main` សូមដាក់ `STUDIO_REF=main REPO_BRANCH=main` មុនពាក្យបញ្ជា។
