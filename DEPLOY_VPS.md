@@ -74,6 +74,14 @@ docker compose logs -f dubber-bot                # ឃើញ "@<username> ready"
 - Studio ទទួល Login ពី Bot ទាំង `DUBBER_BOT_TOKEN` និង `TELEGRAM_LOGIN_BOT_TOKEN`។ បើអេក្រង់ Login ថា «Token របស់ Server (Bot ID …) មិនដូច Bot ដែលបើក» មានន័យថា `DUBBER_BOT_TOKEN` ក្នុង `.env` ទទេ ឬខុស — ដាក់ token របស់ Bot ដែលអ្នកបើកកម្មវិធីពីវា រួច `docker compose up -d --force-recreate studio`។
 - បើបង្ហាញ `token revoked` មានន័យថា token ត្រូវបាន /revoke — ដាក់ token ថ្មី ហើយ restart។
 
+## គម្រោង (Plans) & ការបង់ប្រាក់ KHQR
+
+Admin កំណត់អ្វីៗទាំងអស់ក្នុង App (ការកំណត់ → Admin)៖
+- **គម្រោង & តម្លៃ**៖ Free (VoxCPM2 សាកល្បង ៥ វីដេអូ + សំឡេង AI), Pro $3/ខែ, Pro Plus $5/ខែ, Unlimited $30/ឆ្នាំ — កែតម្លៃ ថ្ងៃ ការពិពណ៌នា និងដែនកំណត់បាន។
+- **KHQR ទទួលប្រាក់**៖ បង្កើត QR ដែលមានចំនួនទឹកប្រាក់ក្នុង App ធនាគារ (ABA/ACLEDA…) → Copy → បិទភ្ជាប់ (១ ឬ ២ ធនាគារ)។ ប៊ូតុង «សាកមើល $1» ឲ្យស្កេនពិនិត្យមុន។
+- **ការបញ្ជាទិញ**៖ សមាជិកបង់ ហើយផ្ញើ Receipt → Admin ទទួលសារ Telegram → ចុច «បញ្ជាក់»។ ដាក់ `BAKONG_API_TOKEN` ក្នុង `.env.studio` ដើម្បីបញ្ជាក់ដោយស្វ័យប្រវត្តិ។
+- **សំឡេង PRO**៖ ផ្ទាំង «សំឡេង» → ចុចផ្កាយលើសំឡេង (ឬបន្ថែមសំឡេងថ្មីជា PRO)។ សំឡេង PRO ប្រើបានតែតាមដែនកំណត់នៃគម្រោង។
+
 ## Update
 
 រត់ពាក្យបញ្ជា `ssh … 'bash -s' < scripts/deploy_vps.sh` ដដែល។ វីដេអូ គណនី និងសំឡេងក្នុងធនាគាររក្សាក្នុង Docker volumes មិនបាត់ទេ។ ពេល branch ត្រូវបាន merge ចូល `main` សូមដាក់ `STUDIO_REF=main REPO_BRANCH=main` មុនពាក្យបញ្ជា។
