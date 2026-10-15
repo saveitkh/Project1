@@ -83,6 +83,10 @@ services:
       - DUBBER_BOT_TOKEN=${DUBBER_BOT_TOKEN:-}
       - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
       - DUBBER_SUPPORT_URL=${DUBBER_SUPPORT_URL:-}
+      # The KH Invoice web app (business management) opened as a Mini App from the bot's menu
+      - DUBBER_BUSINESS_URL=${DUBBER_BUSINESS_URL:-}
+    volumes:
+      - dubber_bot_data:/srv/data
     profiles: ["dubber-bot"]
 
   caddy:
@@ -109,5 +113,6 @@ volumes:
   studio_samples:
   voxcpm_models:
   voxcpm_voices:
+  dubber_bot_data:
   caddy_data:
   caddy_config:

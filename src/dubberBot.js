@@ -6,11 +6,20 @@
  *
  * Env: DUBBER_BOT_TOKEN, DUBBING_STUDIO_URL (https), optional DUBBER_SUPPORT_URL.
  */
+import { spawn } from "node:child_process";
+import fs from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
 import * as studio from "./emojiStudio.js";
 
 const TOKEN = (process.env.DUBBER_BOT_TOKEN || "").trim();
 const STUDIO_URL = (process.env.DUBBING_STUDIO_URL || "").trim();
 const SUPPORT_URL = (process.env.DUBBER_SUPPORT_URL || "").trim();
+const BUSINESS_URL = (process.env.DUBBER_BUSINESS_URL || "").trim();
+const DATA_DIR = process.env.DUBBER_DATA_DIR || "/srv/data";
+const ASSETS = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "assets", "brand");
 const API = (process.env.DUBBER_BOT_API || "https://api.telegram.org").replace(/\/$/, "");
 
 if (!TOKEN) throw new Error("DUBBER_BOT_TOKEN is not set");
@@ -34,6 +43,80 @@ const callSoft = (method, body) => call(method, body).catch(() => null);
 const form = async (method, body) =>
   (await fetch(`${API}/bot${TOKEN}/${method}`, { method: "POST", body, signal: AbortSignal.timeout(120_000) })).json().catch(() => ({}));
 const api = { call: callSoft, form, fileUrl: (p) => `${API}/file/bot${TOKEN}/${p}`, username: "" };
+
+/* ── Tiny store: members, referrals, download counts (a JSON file on a volume) ── */
+const STORE_FILE = path.join(DATA_DIR, "dubber-bot.json");
+let store = { users: {}, animationFileId: "" };
+try {
+  store = { ...store, ...JSON.parse(await fs.readFile(STORE_FILE, "utf8")) };
+} catch {}
+let saveTimer = null;
+const saveStore = () => {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    try {
+      await fs.mkdir(DATA_DIR, { recursive: true });
+      await fs.writeFile(STORE_FILE + ".tmp", JSON.stringify(store));
+      await fs.rename(STORE_FILE + ".tmp", STORE_FILE);
+    } catch (e) {
+      console.warn(`[dubber-bot] store not saved: ${e.message}`);
+    }
+  }, 500);
+};
+/** Finds or creates the member; a first /start?start=ref_<id> credits that member once (never yourself). */
+function member(from, startPayload = "") {
+  const id = String(from.id);
+  let u = store.users[id];
+  if (!u) {
+    u = store.users[id] = { name: from.first_name || from.username || "", joined: Date.now(), downloads: 0, referred: 0, by: null };
+    const ref = /^ref_(\d+)$/.exec(startPayload || "")?.[1];
+    if (ref && ref !== id && store.users[ref]) {
+      u.by = ref;
+      store.users[ref].referred += 1;
+      call("sendMessage", { chat_id: ref, text: `🎉 ${from.first_name || "មិត្ត"} បានចូលរួមតាមតំណណែនាំរបស់អ្នក!` }).catch(() => {});
+    }
+    saveStore();
+  }
+  return u;
+}
+
+/** yt-dlp -> one mp4 (or mp3) under Telegram's 50 MB bot upload limit. */
+function ytdlp(url, audioOnly, dir) {
+  const args = audioOnly
+    ? ["-x", "--audio-format", "mp3", "--audio-quality", "5"]
+    : ["-f", "bv*[height<=720][ext=mp4]+ba[ext=m4a]/b[height<=720][ext=mp4]/b[ext=mp4]/b", "--merge-output-format", "mp4"];
+  return new Promise((resolve, reject) => {
+    const p = spawn("yt-dlp", [...args, "--no-playlist", "--max-filesize", "49M", "--no-warnings", "-o", path.join(dir, "v.%(ext)s"), url]);
+    let err = "";
+    p.stderr.on("data", (d) => (err += d));
+    const timer = setTimeout(() => p.kill("SIGKILL"), 5 * 60_000);
+    p.on("error", reject);
+    p.on("close", async (code) => {
+      clearTimeout(timer);
+      const file = (await fs.readdir(dir)).find((f) => f.startsWith("v."));
+      if (code === 0 && file) return resolve(path.join(dir, file));
+      reject(new Error(/larger than max-filesize|File is larger/i.test(err) ? "ឯកសារធំជាង 50MB (កំណត់របស់ Telegram bot)" : (err.split("\n").filter(Boolean).pop() || "ទាញយកមិនបាន").slice(0, 160)));
+    });
+  });
+}
+
+async function runDownload(chatId, from, url, audioOnly) {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "dl-"));
+  try {
+    const file = await withProgress(chatId, () => ytdlp(url, audioOnly, dir));
+    const fd = new FormData();
+    fd.set("chat_id", String(chatId));
+    fd.set(audioOnly ? "audio" : "video", new Blob([await fs.readFile(file)]), path.basename(file));
+    if (!audioOnly) fd.set("supports_streaming", "true");
+    fd.set("caption", "✅ ទាញយករួច · ឥតគិតថ្លៃ");
+    const r = await form(audioOnly ? "sendAudio" : "sendVideo", fd);
+    if (!r.ok) throw new Error(r.description || "ផ្ញើមិនបាន");
+    member(from).downloads += 1;
+    saveStore();
+  } finally {
+    await fs.rm(dir, { recursive: true, force: true }).catch(() => {});
+  }
+}
 
 /* ── Texts ── */
 const TEXT = {
@@ -64,6 +147,23 @@ const TEXT = {
   badgeHelp:
     `🏷 <b>Terminal Badge</b>\n\nផ្ញើពាក្យបញ្ជា៖\n<code>/badge npm run dev</code>\n<code>/badge dracula git push origin main</code>\n\n` +
     `ធៀម៖ <code>terminal</code> · <code>neon</code> · <code>dracula</code> · <code>light</code>`,
+  download:
+    `⬇️ <b>ទាញយកវីដេអូ (ឥតគិតថ្លៃ)</b>\n\n` +
+    `ផ្ញើ Link មកខ្ញុំ — YouTube · Facebook · TikTok · Instagram · X ឬ Link .mp4\n` +
+    `បន្ថែមពាក្យ <code>audio</code> ក្រោយ Link ដើម្បីបានតែសំឡេង (MP3)។\n\n` +
+    `ℹ️ ឯកសារត្រូវ ≤ 50MB (កំណត់របស់ Telegram)។ វីដេអូវែង សូមប្រើ Khmer Dubber។`,
+  business:
+    `🧾 <b>គ្រប់គ្រងអាជីវកម្ម</b>\n\nបង្កើតវិក្កយបត្រ ស្តុក និងរបាយការណ៍ក្នុង App តែមួយ។`,
+  businessMissing: "🧾 មុខងារនេះមិនទាន់បើក (DUBBER_BUSINESS_URL មិនទាន់កំណត់)។",
+  referral: (count, link) =>
+    `👥 <b>ណែនាំមិត្ត</b>\n\nចែករំលែកតំណនេះ — ពេលមិត្តចុច និងចាប់ផ្ដើមប្រើ អ្នកទទួលបានភ្លាម។\n\n` +
+    `📊 អ្នកបានណែនាំ៖ <b>${count}</b> នាក់\n🔗 <code>${link}</code>`,
+  account: (from, u) =>
+    `👤 <b>គណនី</b>\n\nឈ្មោះ៖ <b>${esc(from.first_name || from.username || "—")}</b>\nTelegram ID៖ <code>${from.id}</code>\n` +
+    `⬇️ បានទាញយក៖ <b>${u.downloads}</b>\n👥 បានណែនាំ៖ <b>${u.referred}</b>\n\n` +
+    `🎬 គម្រោង និងនាទី Khmer Dubber មើលក្នុង App → ការកំណត់។`,
+  menuHint: "ជ្រើសម៉ឺនុយខាងក្រោម 👇",
+  needUrl: "ផ្ញើ Link វីដេអូ (https://…) មកខ្ញុំ 👇",
   busy: "⏳ កំពុងធ្វើមួយរួចហើយ សូមរង់ចាំបន្តិច។",
   working: "⏳ កំពុងបង្កើត…",
   fallback: "ចុចប៊ូតុងខាងក្រោម ឬផ្ញើរូបភាព/GIF/វីដេអូ ដើម្បីបង្កើត Emoji 👇",
@@ -82,6 +182,24 @@ const homeKeyboard = () => ({
     [{ text: "🎨 Emoji Maker", callback_data: "emoji" }, { text: "💻 Coding Emoji", callback_data: "coding" }],
     [{ text: "🏷 Terminal Badge", callback_data: "badge" }, { text: "📖 របៀបប្រើ", callback_data: "help" }, ...(SUPPORT_URL ? [{ text: "💬 ជំនួយ", url: SUPPORT_URL }] : [])],
   ],
+});
+const MENU = {
+  download: "⬇️ ទាញយកវីដេអូ",
+  business: "🧾 គ្រប់គ្រងអាជីវកម្ម",
+  referral: "👥 ណែនាំមិត្ត",
+  account: "👤 គណនី",
+  emoji: "🎨 Emoji Maker",
+  help: "📖 របៀបប្រើ",
+};
+const menuKeyboard = () => ({
+  keyboard: [
+    [{ text: "🎬 Khmer Dubber", web_app: { url: STUDIO_URL } }],
+    [{ text: MENU.download }, { text: MENU.business }],
+    [{ text: MENU.referral }, { text: MENU.account }],
+    [{ text: MENU.emoji }, { text: MENU.help }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
 });
 const backRow = [{ text: "⬅️ ត្រឡប់", callback_data: "home" }];
 const themeKeyboard = (prefix) => ({
@@ -112,6 +230,10 @@ async function setup() {
   const steps = [
     ["setMyCommands", { commands: [
       { command: "start", description: "បើក Khmer Dubber" },
+      { command: "download", description: "ទាញយកវីដេអូ (ឥតគិតថ្លៃ)" },
+      { command: "business", description: "គ្រប់គ្រងអាជីវកម្ម" },
+      { command: "referral", description: "ណែនាំមិត្ត" },
+      { command: "account", description: "គណនី" },
       { command: "emoji", description: "Emoji Maker — បង្កើត Emoji ពីរូប/GIF/វីដេអូ" },
       { command: "coding", description: "Coding & Terminal Emoji" },
       { command: "badge", description: "Terminal Badge ពីអក្សរ" },
@@ -175,6 +297,56 @@ async function runBadge(msg, label, theme) {
   await send(msg.chat.id, TEXT.emojiDone(pack.link, pack.count));
 }
 
+/** The logo spins one full turn forward (MP4), then the menu appears. */
+async function welcome(msg, startPayload) {
+  const chatId = msg.chat.id;
+  member(msg.from, startPayload);
+  const [text, markup] = VIEWS.home(msg.from);
+  let sent = false;
+  try {
+    const fd = new FormData();
+    fd.set("chat_id", String(chatId));
+    if (store.animationFileId) fd.set("animation", store.animationFileId);
+    else fd.set("animation", new Blob([await fs.readFile(path.join(ASSETS, "telescripts-spin.mp4"))]), "telescripts-spin.mp4");
+    fd.set("width", "512");
+    fd.set("height", "512");
+    fd.set("caption", text);
+    fd.set("parse_mode", "HTML");
+    fd.set("reply_markup", JSON.stringify(markup));
+    const r = await form("sendAnimation", fd);
+    if (r.ok) {
+      sent = true;
+      const id = r.result?.animation?.file_id || r.result?.document?.file_id;
+      if (id && id !== store.animationFileId) {
+        store.animationFileId = id;
+        saveStore();
+      }
+    } else if (store.animationFileId) {
+      store.animationFileId = ""; // a stale file_id: next /start uploads it again
+    }
+  } catch (e) {
+    console.warn(`[dubber-bot] logo animation: ${e.message}`);
+  }
+  if (!sent) await send(chatId, text, markup);
+  await send(chatId, TEXT.menuHint, menuKeyboard());
+}
+
+const business = (chatId) =>
+  BUSINESS_URL
+    ? send(chatId, TEXT.business, { inline_keyboard: [[{ text: "🧾 បើក App អាជីវកម្ម", web_app: { url: BUSINESS_URL } }]] })
+    : send(chatId, TEXT.businessMissing);
+
+async function referral(msg) {
+  const u = member(msg.from);
+  const link = `https://t.me/${api.username}?start=ref_${msg.from.id}`;
+  return send(msg.chat.id, TEXT.referral(u.referred, link), {
+    inline_keyboard: [[{ text: "📤 ចែករំលែក", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("🎬 Khmer Dubber — បញ្ចូលសំឡេងខ្មែរលើវីដេអូ")}` }]],
+  });
+}
+
+const account = (msg) =>
+  send(msg.chat.id, TEXT.account(msg.from, member(msg.from)), { inline_keyboard: [[openButton]] });
+
 const show = (chat_id, view, from) => {
   const [text, markup] = VIEWS[view](from);
   return send(chat_id, text, markup);
@@ -188,7 +360,22 @@ async function onMessage(msg) {
   const cmd = head.toLowerCase().replace(/@.*$/, "");
   const args = rest.join(" ");
 
-  if (cmd === "/start") return show(chatId, "home", msg.from);
+  if (cmd === "/start") return welcome(msg, args);
+  const pick = Object.entries(MENU).find(([, label]) => label === raw)?.[0];
+  if (pick === "download") return send(chatId, TEXT.download);
+  if (pick === "business") return business(chatId);
+  if (pick === "referral") return referral(msg);
+  if (pick === "account") return account(msg);
+  if (pick === "emoji") return show(chatId, "emoji");
+  if (pick === "help") return show(chatId, "help");
+  if (cmd === "/download") return send(chatId, TEXT.download);
+  if (cmd === "/business") return business(chatId);
+  if (cmd === "/referral") return referral(msg);
+  if (cmd === "/account") return account(msg);
+  const url = /https?:\/\/\S+/i.exec(raw)?.[0];
+  if (url && !studio.mediaOf(msg)) {
+    return exclusive(chatId, () => runDownload(chatId, msg.from, url, /\b(audio|mp3|សំឡេង)\b/i.test(raw.replace(url, ""))));
+  }
   if (cmd === "/help") return show(chatId, "help");
   if (cmd === "/coding") {
     const theme = args.toLowerCase();
