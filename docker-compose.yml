@@ -85,6 +85,8 @@ services:
       - DUBBER_SUPPORT_URL=${DUBBER_SUPPORT_URL:-}
       # The KH Invoice web app (business management) opened as a Mini App from the bot's menu
       - DUBBER_BUSINESS_URL=${DUBBER_BUSINESS_URL:-}
+      # Telegram IDs allowed to run /makeemoji (builds the spinning 3D button icons)
+      - DUBBER_ADMIN_IDS=${DUBBER_ADMIN_IDS:-${STUDIO_TELEGRAM_ADMIN_IDS:-}}
     volumes:
       - dubber_bot_data:/srv/data
     profiles: ["dubber-bot"]
