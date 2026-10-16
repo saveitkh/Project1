@@ -37,6 +37,7 @@ import * as telegramStorage from "./telegramStorage.js";
 import { signInWithTelegram, signInWithTelegramMiniApp } from "./telegramLogin.js";
 import { answerCallbackQuery, call as botApi, stampDecision } from "./notifyBot.js";
 import { loop } from "./worker.js";
+import { applyBotProfile } from "./botProfile.js";
 
 const app = express();
 app.use(express.json());
@@ -1055,6 +1056,7 @@ async function registerBotWebhook() {
   } catch (err) {
     console.error("Could not set the Telegram bot webhook:", err?.message ?? err);
   }
+  await applyBotProfile().catch((err) => console.error("Could not set the bot profile:", err?.message ?? err));
   // The button beside the message box: always in view, and a Mini App opened
   // from it receives the signed initData (a reply-keyboard one does not).
   const appUrl = config.webAppUrl || (config.khInvoiceBridgeSecret ? `${config.publicUrl.replace(/\/$/, "")}/invoice/` : "");

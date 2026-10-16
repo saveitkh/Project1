@@ -177,6 +177,7 @@ const TEXT = {
       `{:m_pro:} SaveIt Pro — Telegram (ក្រុម/channel ឯកជន)\n` +
       `      {:gift:} សាកល្បងឥតគិតថ្លៃ 10 វីដេអូ\n` +
       `      {:video:} វីដេអូពេញទំហំ គ្មានកម្រិត 50MB\n\n` +
+      `{:video:} AI បញ្ចូលសំឡេងខ្មែរ · {:sparkle:} Emoji Maker\n\n` +
       `គ្រាន់តែ ផ្ញើតំណមក ខ្ញុំធ្វើនៅសល់។`,
     help:
       `{:m_help:} របៀបប្រើ\n\n` +
@@ -285,6 +286,7 @@ const TEXT = {
       `{:m_pro:} SaveIt Pro — Telegram (private groups/channels)\n` +
       `      {:gift:} 10 videos free to try\n` +
       `      {:video:} Full-size video, no 50MB limit\n\n` +
+      `{:video:} AI Khmer dubbing · {:sparkle:} Emoji Maker\n\n` +
       `Just send me a link and I'll do the rest.`,
     help:
       `{:m_help:} How to use\n\n` +
