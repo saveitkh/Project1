@@ -3,7 +3,8 @@
 # names below resolve to the VPS IP, so no domain has to be bought.
 #
 #   cp .env.studio.example .env.studio   # GEMINI_API_KEY, STUDIO_ADMIN_PASSWORD
-#   docker compose up -d --build         # studio + https
+#   docker compose up -d --build         # studio + VoxCPM2 voice cloning + https
+#   (or just run scripts/deploy_vps.sh on the VPS)
 #   docker compose --profile bot up -d --build   # ALSO run this bot here (see below)
 #
 # Then set DUBBING_STUDIO_URL=https://<STUDIO_HOST>/ wherever the bot runs.
@@ -11,7 +12,7 @@ services:
   studio:
     # Built straight from the studio's GitHub repo; set STUDIO_GIT_REF=main once merged
     build:
-      context: https://github.com/saveitkh/BarameyDabber.git#${STUDIO_GIT_REF:-claude/affectionate-noether-yvzenh}
+      context: https://github.com/saveitkh/BarameyDabber.git#${STUDIO_GIT_REF:-claude/admiring-curie-90hbte}
     container_name: dubbing-studio
     restart: unless-stopped
     env_file:
@@ -19,8 +20,14 @@ services:
     environment:
       - PORT=3000
       - STUDIO_PUBLIC_MODE=1
-      # Telegram auto-login: same bot token the bot uses (TELEGRAM_LOGIN_BOT_TOKEN in .env)
-      - STUDIO_TELEGRAM_BOT_TOKEN=${TELEGRAM_LOGIN_BOT_TOKEN:-}
+      # Telegram auto-login: the studio accepts a Mini App opened from ANY of these bots
+      # (the new TeleScripts bot first, the old login bot too), so a stale token never locks people out
+      - STUDIO_TELEGRAM_BOT_TOKEN=${DUBBER_BOT_TOKEN:-},${TELEGRAM_LOGIN_BOT_TOKEN:-}
+      - STUDIO_BOT_USERNAME=${DUBBER_BOT_USERNAME:-}
+      # Voice cloning runs in the voxcpm container below (private network only).
+      # VOXCPM_URL in .env can point at the Colab GPU notebook instead (faster).
+      - VOXCPM_API_URL=${VOXCPM_URL:-http://voxcpm:8000}
+      - VOXCPM_API_KEY=${VOXCPM_API_KEY:-}
     volumes:
       - studio_data:/app/data
       - studio_uploads:/app/uploads
@@ -28,6 +35,25 @@ services:
       - studio_samples:/app/samples
     expose:
       - "3000"
+    # No depends_on on voxcpm: `up -d studio` must not restart the CPU VoxCPM2 when the studio
+    # uses a Colab GPU (VOXCPM_URL). Without VoxCPM2 the studio falls back to the plain Khmer voice.
+
+  # VoxCPM2 2.0.3 voice cloning on the VPS CPU, with the Khmer voice bank.
+  # First start downloads the model (~5 GB) into voxcpm_models; it needs ~8 GB RAM.
+  voxcpm:
+    build:
+      context: https://github.com/saveitkh/BarameyDabber.git#${STUDIO_GIT_REF:-claude/admiring-curie-90hbte}:voxcpm_server
+    container_name: voxcpm2
+    restart: unless-stopped
+    environment:
+      - VOXCPM_API_KEY=${VOXCPM_API_KEY:-}
+      # More diffusion steps = cleaner voice but slower on a CPU (default 10)
+      - VOXCPM_TIMESTEPS=${VOXCPM_TIMESTEPS:-10}
+    volumes:
+      - voxcpm_models:/models
+      - voxcpm_voices:/data
+    expose:
+      - "8000"
 
   # The bot/userbot service from this repo. Opt-in (--profile bot): run it here only if
   # it is NOT also running on Railway -- two copies of the userbot fight over the
@@ -45,6 +71,25 @@ services:
       - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
     expose:
       - "8000"
+
+  # The small "Khmer Dubber" bot (its own BotFather token): /start -> button that opens the
+  # Mini App. Long polling, so it needs no public URL and never clashes with the other bot.
+  dubber-bot:
+    build: .
+    container_name: dubber-bot
+    restart: unless-stopped
+    command: ["node", "src/dubberBot.js"]
+    environment:
+      - DUBBER_BOT_TOKEN=${DUBBER_BOT_TOKEN:-}
+      - DUBBING_STUDIO_URL=https://${STUDIO_HOST:?Set STUDIO_HOST}/
+      - DUBBER_SUPPORT_URL=${DUBBER_SUPPORT_URL:-}
+      # The KH Invoice web app (business management) opened as a Mini App from the bot's menu
+      - DUBBER_BUSINESS_URL=${DUBBER_BUSINESS_URL:-}
+      # Telegram IDs allowed to run /makeemoji (builds the spinning 3D button icons)
+      - DUBBER_ADMIN_IDS=${DUBBER_ADMIN_IDS:-${STUDIO_TELEGRAM_ADMIN_IDS:-}}
+    volumes:
+      - dubber_bot_data:/srv/data
+    profiles: ["dubber-bot"]
 
   caddy:
     image: caddy:2
@@ -68,5 +113,8 @@ volumes:
   studio_uploads:
   studio_outputs:
   studio_samples:
+  voxcpm_models:
+  voxcpm_voices:
+  dubber_bot_data:
   caddy_data:
   caddy_config:
