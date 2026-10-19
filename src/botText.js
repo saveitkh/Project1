@@ -97,6 +97,14 @@ const MENU = [
     aliases: ["🎬 Dubbing Studio"],
   },
   {
+    action: "song",
+    emoji: "sparkle",
+    style: "primary",
+    km: "🎵 បង្កើតបទចម្រៀង (AI Song)",
+    en: "🎵 AI Khmer Song",
+    aliases: ["🎵 Khmer Sonic AI", "🎵 បង្កើតបទចម្រៀង"],
+  },
+  {
     action: "app",
     emoji: "app_tg",
     km: "📲 Open App",
@@ -154,6 +162,7 @@ export function mainKeyboard(language) {
   // A plain button: the bot answers with an inline Mini App button, because only an
   // inline-opened Mini App receives the signed initData the studio logs people in with.
   if (config.dubbingStudioUrl) rows.push([button("dubbing")]);
+  if (config.songStudioUrl) rows.push([button("song")]);
   if (appUrl) rows.push([{ ...button("app"), web_app: { url: appUrl } }]);
   return { keyboard: rows, resize_keyboard: true, is_persistent: true };
 }
@@ -214,6 +223,9 @@ const TEXT = {
     dubbingOpen: "{:video:} AI បញ្ចូលសំឡេងខ្មែរ — Upload វីដេអូ ស្កេន បកប្រែ ហើយបង្កើតវីដេអូនិយាយខ្មែរ៖",
     dubbingButton: "🎬 បើក Dubbing Studio",
     dubbingMissing: "{:video:} Dubbing Studio មិនទាន់បានដាក់ដំណើរការទេ។",
+    songOpen: "{:sparkle:} Khmer Sonic AI — ក្លូនសំឡេងខ្មែរ តែងទំនុកច្រៀង និងបង្កើតបទចម្រៀងដោយ AI៖",
+    songButton: "🎵 បើក Khmer Sonic AI",
+    songMissing: "{:sparkle:} Khmer Sonic AI មិនទាន់បានដាក់ដំណើរការទេ។",
     sendLink: "{:dl:} ផ្ញើតំណវីដេអូមកទីនេះ (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…)។",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — ឥតគិតថ្លៃ មិនកំណត់\n\n` +
@@ -322,6 +334,9 @@ const TEXT = {
     dubbingOpen: "{:video:} AI Khmer dubbing — upload a video, scan, translate and get it back speaking Khmer:",
     dubbingButton: "🎬 Open Dubbing Studio",
     dubbingMissing: "{:video:} The Dubbing Studio isn't deployed yet.",
+    songOpen: "{:sparkle:} Khmer Sonic AI — clone a Khmer voice, write lyrics and create AI songs:",
+    songButton: "🎵 Open Khmer Sonic AI",
+    songMissing: "{:sparkle:} Khmer Sonic AI isn't deployed yet.",
     sendLink: "{:dl:} Send a video link here (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…).",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — free & unlimited\n\n` +

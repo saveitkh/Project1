@@ -29,6 +29,34 @@ services:
     expose:
       - "3000"
 
+  # Khmer Sonic AI: a second Mini App (Khmer voice clone / lyrics / AI song),
+  # built straight from its GitHub repo. One Node process serves the PWA + API.
+  # Defaults to the mock engine, so it runs with no keys; add provider keys to
+  # the VPS .env (ANTHROPIC_API_KEY, GEMINI_API_KEY, ...) and flip the
+  # SONG_*_PROVIDER vars to go live.
+  song:
+    build:
+      context: https://github.com/saveitkh/khmer-song-.git#${SONG_GIT_REF:-claude/khmer-song-ui-production-9z3b8b}
+    container_name: khmer-sonic
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      - PUBLIC_URL=https://${SONG_HOST:?Set SONG_HOST, e.g. song.184-174-38-113.sslip.io}
+      # Telegram Mini App auth: same bot token the bot logs people in with.
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_LOGIN_BOT_TOKEN:-}
+      # Engines — all optional; default mock so it runs with zero keys.
+      - VOICE_PROVIDER=${SONG_VOICE_PROVIDER:-mock}
+      - LYRICS_PROVIDER=${SONG_LYRICS_PROVIDER:-mock}
+      - MUSIC_PROVIDER=${SONG_MUSIC_PROVIDER:-mock}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - VOXCPM_WORKER_URL=${VOXCPM_WORKER_URL:-}
+      - VOXCPM_WORKER_SECRET=${VOXCPM_WORKER_SECRET:-}
+      - SUPABASE_URL=${SONG_SUPABASE_URL:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SONG_SUPABASE_SERVICE_ROLE_KEY:-}
+    expose:
+      - "3000"
+
   # The bot/userbot service from this repo. Opt-in (--profile bot): run it here only if
   # it is NOT also running on Railway -- two copies of the userbot fight over the
   # Telegram session and the webhook.
@@ -52,11 +80,13 @@ services:
     restart: unless-stopped
     depends_on:
       - studio
+      - song
     ports:
       - "80:80"
       - "443:443"
     environment:
       - STUDIO_HOST=${STUDIO_HOST:?Set STUDIO_HOST, e.g. dub.184-174-38-113.sslip.io}
+      - SONG_HOST=${SONG_HOST:?Set SONG_HOST, e.g. song.184-174-38-113.sslip.io}
       - BOT_HOST=${BOT_HOST:-bot.localhost}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

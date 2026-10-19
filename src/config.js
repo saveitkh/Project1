@@ -67,6 +67,10 @@ export const config = {
   // The Khmer AI dubbing studio (separate Python service, see docker-compose.yml),
   // opened as a Mini App from "🎬 Dubbing Studio". Must be https. Unset = no button.
   dubbingStudioUrl: str("DUBBING_STUDIO_URL"),
+  // Khmer Sonic AI (separate Node service in the saveitkh/khmer-song- repo, see
+  // docker-compose.yml), opened as a Mini App from "🎵 បង្កើតបទចម្រៀង". Must be
+  // https. Unset = no button.
+  songStudioUrl: str("SONG_STUDIO_URL"),
   // KH Invoice, the separate invoicing app the bot also fronts (see
   // khInvoice.js). The bridge is that app's telegram-bridge edge function;
   // the secret is the one stored in its bridge_config row. The web URL is
