@@ -67,6 +67,14 @@ export const config = {
   // The Khmer AI dubbing studio (separate Python service, see docker-compose.yml),
   // opened as a Mini App from "🎬 Dubbing Studio". Must be https. Unset = no button.
   dubbingStudioUrl: str("DUBBING_STUDIO_URL"),
+  // VoxCPM2 48kHz voice cloning needs a GPU, so it is NOT run on the VPS. A Pro
+  // user opens this Colab notebook (/voxcpm or ?start=voxcpm), runs it on a free
+  // Colab GPU, and pastes the public URL it prints into the studio's Account tab.
+  // Defaults to the notebook in the BarameyDabber repo; override per deployment.
+  voxcpmColabUrl: str(
+    "VOXCPM_COLAB_URL",
+    "https://colab.research.google.com/github/saveitkh/BarameyDabber/blob/main/voxcpm_server/VoxCPM2_Colab_Server.ipynb"
+  ),
   // KH Invoice, the separate invoicing app the bot also fronts (see
   // khInvoice.js). The bridge is that app's telegram-bridge edge function;
   // the secret is the one stored in its bridge_config row. The web URL is

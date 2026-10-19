@@ -308,6 +308,9 @@ export async function handleMessage(message) {
 
   if (startPayload && (await khInvoice.handleStart(chatId, user, startPayload))) return;
 
+  // Deeplink t.me/<bot>?start=voxcpm: the Pro-only VoxCPM2 GPU (Colab) setup.
+  if (startPayload === "voxcpm") return showVoxcpm(chatId, user, t);
+
   if (/^\/start\b/.test(text) || text === "/help" || !text) {
     const name = from.first_name || from.username || "";
     await send(chatId, t.welcome(name), { reply_markup: mainKeyboard(user.language) });
@@ -363,12 +366,15 @@ export async function handleMessage(message) {
     }
     case "app":
       return send(chatId, config.webAppUrl ? t.openApp(config.webAppUrl) : t.openAppMissing);
-    case "dubbing":
-      return config.dubbingStudioUrl
-        ? send(chatId, t.dubbingOpen, {
-            reply_markup: { inline_keyboard: [[{ text: t.dubbingButton, web_app: { url: config.dubbingStudioUrl } }]] },
-          })
-        : send(chatId, t.dubbingMissing);
+    case "dubbing": {
+      if (!config.dubbingStudioUrl) return send(chatId, t.dubbingMissing);
+      const rows = [[{ text: t.dubbingButton, web_app: { url: config.dubbingStudioUrl } }]];
+      // VoxCPM2 GPU runs on Colab (Pro only); the button checks Pro server-side.
+      if (config.voxcpmColabUrl) rows.push([{ text: t.dubbingVoxButton, callback_data: "bot:voxcpm:open" }]);
+      return send(chatId, t.dubbingOpen, { reply_markup: { inline_keyboard: rows } });
+    }
+    case "voxcpm":
+      return showVoxcpm(chatId, user, t);
     default:
       break;
   }
@@ -656,6 +662,7 @@ function commandAction(text) {
     case "/language": return "language";
     case "/app": return "app";
     case "/dubbing": return "dubbing";
+    case "/voxcpm": return "voxcpm";
     case "/buy": return "buy";
     case "/free": return "free";
     case "/premium": return "premium";
@@ -696,6 +703,15 @@ export async function handleCallback(cq) {
     if (value === "history") await showHistory(chatId, user);
     else if (value === "language") await send(chatId, t.languagePrompt, { reply_markup: languageKeyboard() });
     else await send(chatId, t.help);
+    return true;
+  }
+
+  if (kind === "voxcpm") {
+    // The "⚡ VoxCPM2 GPU (Pro)" button on the Dubbing screen.
+    const user = await ensureUser(cq.from, null);
+    const t = texts(user.language);
+    await call("answerCallbackQuery", { callback_query_id: cq.id });
+    await showVoxcpm(chatId, user, t);
     return true;
   }
 
@@ -760,6 +776,21 @@ function telegramAccess(chatId, quota) {
   if (config.botPrivateLinks === "admin") return "off";
   if (config.botPrivateLinks === "all") return "ok";
   return quota.premium || quota.left > 0 ? "ok" : "used-up";
+}
+
+/**
+ * VoxCPM2 48kHz voice cloning on a free Colab GPU — Pro (VIP) only. The heavy
+ * model is not run on the VPS; a Pro user runs the Colab notebook and pastes
+ * the public URL it prints into the studio's Account tab. Reached from /voxcpm,
+ * the ?start=voxcpm deeplink, or the Dubbing screen's "⚡ VoxCPM2 GPU" button.
+ */
+async function showVoxcpm(chatId, user, t) {
+  const quota = await quotaFor(user);
+  if (!quota.premium) return send(chatId, t.voxcpmLocked);
+  if (!config.voxcpmColabUrl) return send(chatId, t.voxcpmMissing);
+  const rows = [[{ text: t.voxcpmButton, url: config.voxcpmColabUrl }]];
+  if (config.dubbingStudioUrl) rows.push([{ text: t.voxcpmStudioButton, web_app: { url: config.dubbingStudioUrl } }]);
+  return send(chatId, t.voxcpmPro(), { reply_markup: { inline_keyboard: rows } });
 }
 
 /** The Pro screen: trial progress, VIP, or trial spent. */

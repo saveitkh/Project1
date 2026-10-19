@@ -63,6 +63,8 @@ docker compose logs -f studio      # រង់ចាំឃើញ "Application st
 
 ```
 DUBBING_STUDIO_URL=https://dub.184-174-38-113.sslip.io/
+# ស្ម័គ្រចិត្ត៖ តំណ Colab VoxCPM2 សម្រាប់ user Pro (បើមិនដាក់ ប្រើតំណ notebook ក្នុង repo BarameyDabber ដោយស្វ័យប្រវត្ត)
+VOXCPM_COLAB_URL=
 ```
 
 - **Bot នៅលើ Railway**៖ Railway → Service → Variables → បន្ថែមខាងលើ → Redeploy។
@@ -92,11 +94,26 @@ cd Project1 && git pull
 docker compose build --no-cache studio && docker compose up -d
 ```
 
-ពេល Studio branch ត្រូវបាន merge ចូល `main` រួច សូមដាក់ `STUDIO_GIT_REF=main` ក្នុង `.env`។
+ពេល Studio branch ត្រូវបាន merge ចូល `main` រួច សូមដាក់ `STUDIO_GIT_REF=main` ក្នុង `.env`។ (បច្ចុប្បន្ន មុខងារថ្មីៗនៅលើ branch `claude/telegram-voxcpm2-deeplink-32gdj5` — ដាក់ `STUDIO_GIT_REF=claude/telegram-voxcpm2-deeplink-32gdj5` ដើម្បីសាកមុន merge។)
+
+## ៨. VoxCPM2 (ក្លូនសំឡេង 48kHz) — ដំណើរការលើ Colab GPU សម្រាប់ Pro
+
+VoxCPM2 ត្រូវការ GPU ដូច្នេះ **យើងលែង Run វានៅលើ VPS ទេ** (VPS គ្មាន GPU ហើយវាទាញ model ~5GB)។ ឥឡូវវា Run លើ **Google Colab ឥតគិតថ្លៃ** ហើយ user **Pro (VIP)** ទទួលបាន deeplink ពី Bot៖
+
+1. ក្នុង Bot វាយ `/voxcpm` (ឬ `t.me/<bot>?start=voxcpm`, ឬចុច «⚡ VoxCPM2 GPU (Pro)» ក្នុងអេក្រង់ Dubbing)។
+2. Bot ពិនិត្យថាជា Pro → ផ្ដល់ប៊ូតុង «⚡ បើក Colab GPU» + ការណែនាំ។
+3. User ចុច → ចូល Google → Runtime → Change runtime type → GPU → Run all → ចម្លង Public URL (xxxx.trycloudflare.com / …gradio.live)។
+4. បើក Studio → ផ្ទាំង «ការកំណត់» → បិទភ្ជាប់ URL នោះ → រក្សាទុក។ ឥឡូវ Dub នឹងប្រើ VoxCPM2 48kHz។
+
+គ្មាន URL ក៏ Studio នៅ Dub បានដែរ ដោយសំឡេងខ្មែរ AI ធម្មតា។ Admin អាចកំណត់ `VOXCPM_COLAB_URL` ក្នុង `.env` របស់ Bot បើ fork notebook ផ្ទាល់ខ្លួន។
+
+## ៩. វីដេអូវែង (Dub ម្ដងមួយចំណែក)
+
+ក្នុង Studio មានផ្ទាំងថ្មី **«វែង»**៖ Upload វីដេអូវែង → AI កាត់ជាចំណែក ~៥ នាទី → ស្កេន & បកប្រែម្ដងមួយ (ផ្ទៃខាងក្រោយ) → user ពិនិត្យ/កែ → ចុច «បង្កើតវីដេអូទាំងអស់» → វា Dub បន្តម្ដងមួយចំណែករហូតចប់ → ទទួលបានទាំង **វីដេអូពេញ** និង **ចំណែកៗ**។ មិនត្រូវការការកំណត់បន្ថែមលើ VPS ទេ (ប្រើ pipeline ដដែល)។ វីដេអូពេញបង្ហាញក្នុងផ្ទាំង «វីដេអូ» ផងដែរ។
 
 ## ចំណាំ
 
 - **១ គណនី = ១ ឧបករណ៍**៖ Login ក្នុង Telegram នឹងចាកចេញពី Browser ផ្សេង។
 - **បន្ថែមអ្នកប្រើ Studio**៖ ដាក់ `STUDIO_ALLOW_REGISTER=1` ក្នុង `.env.studio` → `docker compose up -d` → ឲ្យគេចុះឈ្មោះ → ដាក់ `0` វិញ។
-- VPS គ្មាន GPU៖ ការក្លូនសំឡេង VoxCPM2 ប្រើ Link ពី Colab ដដែល។
-- វីដេអូ និងគណនីរបស់ Studio ត្រូវបានរក្សាក្នុង Docker volumes (`studio_data`, `studio_outputs`…) មិនបាត់ពេល Update ទេ។
+- VPS គ្មាន GPU៖ ការក្លូនសំឡេង VoxCPM2 ប្រើ Link ពី Colab (មើលផ្នែក ៨)។
+- វីដេអូ និងគណនីរបស់ Studio ត្រូវបានរក្សាក្នុង Docker volumes (`studio_data`, `studio_outputs`…) មិនបាត់ពេល Update ទេ។ គម្រោងវីដេអូវែងរក្សាក្នុង `studio_data` (`longdub_projects.json`)។

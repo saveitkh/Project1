@@ -96,6 +96,15 @@ const MENU = [
     en: "🎬 AI Khmer Dubbing",
     aliases: ["🎬 Dubbing Studio"],
   },
+  // VoxCPM2 GPU voice cloning on Colab, for Pro users (reached by /voxcpm or the
+  // Dubbing screen's "⚡ VoxCPM2 GPU" button, not a persistent-keyboard button).
+  {
+    action: "voxcpm",
+    emoji: "premium",
+    km: "⚡ VoxCPM2 — ក្លូនសំឡេង GPU (Pro)",
+    en: "⚡ VoxCPM2 — GPU voice clone (Pro)",
+    aliases: ["⚡ VoxCPM2 GPU", "⚡ VoxCPM2"],
+  },
   {
     action: "app",
     emoji: "app_tg",
@@ -214,6 +223,24 @@ const TEXT = {
     dubbingOpen: "{:video:} AI បញ្ចូលសំឡេងខ្មែរ — Upload វីដេអូ ស្កេន បកប្រែ ហើយបង្កើតវីដេអូនិយាយខ្មែរ៖",
     dubbingButton: "🎬 បើក Dubbing Studio",
     dubbingMissing: "{:video:} Dubbing Studio មិនទាន់បានដាក់ដំណើរការទេ។",
+    dubbingVoxButton: "⚡ VoxCPM2 GPU (Pro)",
+    voxcpmPro: () =>
+      `{:premium:} VoxCPM2 — ក្លូនសំឡេង 48kHz លើ GPU (សម្រាប់ Pro)\n\n` +
+      `ម៉ាស៊ីនក្លូនសំឡេងត្រូវការ GPU ដូច្នេះវាដំណើរការលើ Google Colab ឥតគិតថ្លៃ (Pro: L4/A100) — មិនមែននៅលើ VPS ទេ។\n\n` +
+      `របៀបប្រើ៖\n` +
+      `1️⃣ ចុច «⚡ បើក Colab GPU» ខាងក្រោម → ចូល Google\n` +
+      `2️⃣ Runtime → Change runtime type → ជ្រើស GPU (T4/L4/A100) → Save\n` +
+      `3️⃣ Runtime → Run all (▶) រង់ចាំ ~៣-៥ នាទី\n` +
+      `4️⃣ ចម្លង Public URL ដែលវាបង្ហាញ (xxxx.trycloudflare.com ឬ …gradio.live)\n` +
+      `5️⃣ បើក Dubbing Studio → ផ្ទាំង «ការកំណត់» → បិទភ្ជាប់ URL នោះ → រក្សាទុក\n\n` +
+      `{:bulb:} ទុក Colab tab បើកចោល ពេលកំពុង Dub។ បើបិទ ត្រូវ Run all ម្ដងទៀត ហើយដាក់ URL ថ្មី។`,
+    voxcpmButton: "⚡ បើក Colab GPU",
+    voxcpmStudioButton: "🎬 បើក Studio",
+    voxcpmLocked:
+      `{:lock:} VoxCPM2 (ក្លូនសំឡេង GPU) សម្រាប់តែ Pro / VIP ប៉ុណ្ណោះ។\n\n` +
+      `គណនីធម្មតានៅតែ Dub បានដោយសំឡេងខ្មែរ AI ធម្មតា។ ចង់ក្លូនសំឡេងតួ 48kHz ច្បាស់ៗ? សូមដំឡើងទៅ VIP។\n\n` +
+      `👉 ចុច {:credit:} បញ្ចូល Credit / VIP ក្នុងម៉ឺនុយ ឬវាយ /buy`,
+    voxcpmMissing: "{:warn:} តំណ Colab VoxCPM2 មិនទាន់បានកំណត់ទេ — សូមឲ្យ Admin កំណត់ VOXCPM_COLAB_URL។",
     sendLink: "{:dl:} ផ្ញើតំណវីដេអូមកទីនេះ (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…)។",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — ឥតគិតថ្លៃ មិនកំណត់\n\n` +
@@ -322,6 +349,24 @@ const TEXT = {
     dubbingOpen: "{:video:} AI Khmer dubbing — upload a video, scan, translate and get it back speaking Khmer:",
     dubbingButton: "🎬 Open Dubbing Studio",
     dubbingMissing: "{:video:} The Dubbing Studio isn't deployed yet.",
+    dubbingVoxButton: "⚡ VoxCPM2 GPU (Pro)",
+    voxcpmPro: () =>
+      `{:premium:} VoxCPM2 — 48kHz voice cloning on a GPU (Pro)\n\n` +
+      `The voice-clone engine needs a GPU, so it runs on a free Google Colab GPU (Pro: L4/A100) — not on the VPS.\n\n` +
+      `How to use it:\n` +
+      `1️⃣ Tap "⚡ Open Colab GPU" below → sign in to Google\n` +
+      `2️⃣ Runtime → Change runtime type → pick a GPU (T4/L4/A100) → Save\n` +
+      `3️⃣ Runtime → Run all (▶), wait ~3-5 min\n` +
+      `4️⃣ Copy the public URL it prints (xxxx.trycloudflare.com or …gradio.live)\n` +
+      `5️⃣ Open the Dubbing Studio → "Account" tab → paste that URL → Save\n\n` +
+      `{:bulb:} Keep the Colab tab open while dubbing. If it closes, Run all again and paste the new URL.`,
+    voxcpmButton: "⚡ Open Colab GPU",
+    voxcpmStudioButton: "🎬 Open Studio",
+    voxcpmLocked:
+      `{:lock:} VoxCPM2 (GPU voice cloning) is for Pro / VIP only.\n\n` +
+      `Free accounts can still dub with the built-in Khmer AI voices. Want crisp 48kHz character voice cloning? Upgrade to VIP.\n\n` +
+      `👉 Tap {:credit:} Add Credit / VIP in the menu, or type /buy`,
+    voxcpmMissing: "{:warn:} The VoxCPM2 Colab link isn't configured yet — ask the admin to set VOXCPM_COLAB_URL.",
     sendLink: "{:dl:} Send a video link here (YouTube, Facebook, TikTok, Telegram, .mp4, .m3u8…).",
     freeScreen: () =>
       `{:m_free:} SaveIt Free — free & unlimited\n\n` +
