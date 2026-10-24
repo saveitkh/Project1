@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Deploy / update the Khmer Dubber studio + VoxCPM2 + HTTPS on this VPS.
-# Run as root on the VPS, or from your own computer:
-#   ssh root@184.174.38.113 'bash -s' < scripts/deploy_vps.sh
-# Safe to run again for every update.
+# Deploy / update the Khmer Dubber studio (+ VoxCPM2 when the machine has the RAM) + HTTPS.
+# Works on any Ubuntu VPS (AWS Lightsail, Contabo, ...). On the VPS:
+#   curl -fsSL https://raw.githubusercontent.com/saveitkh/Project1/claude/admiring-curie-90hbte/scripts/deploy_vps.sh | sudo bash
+# Safe to run again for every update. The https address is made from the VPS's public IP
+# (dub.<ip-with-dashes>.sslip.io) unless STUDIO_HOST is already set in .env.
+# WITH_VOXCPM=1 forces the CPU VoxCPM2 even under 8 GB RAM (it will be slow and may be killed).
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/saveitkh/Project1.git}"
@@ -18,11 +20,19 @@ CPUS=$(nproc)
 MEM_GB=$(awk '/MemTotal/ {printf "%d", $2/1024/1024}' /proc/meminfo)
 DISK_GB=$(df -BG --output=avail / | tail -1 | tr -dc '0-9')
 echo "CPU: ${CPUS} | RAM: ${MEM_GB} GB | free disk: ${DISK_GB} GB"
-[ "$MEM_GB" -lt 8 ] && warn "VoxCPM2 on CPU needs ~8 GB RAM; with ${MEM_GB} GB it may be killed (the studio then falls back to the plain Khmer AI voice)."
-[ "$DISK_GB" -lt 20 ] && warn "Less than 20 GB free: the images + VoxCPM2 model need ~15 GB."
+# VoxCPM2 (voice cloning on the CPU) needs ~8 GB RAM. Smaller machines run the studio with
+# the AI voices only ("AI (លឿន)": Gemini, no cloning), which need no extra RAM.
+WITH_VOXCPM="${WITH_VOXCPM:-$([ "$MEM_GB" -ge 7 ] && echo 1 || echo 0)}"
+if [ "$WITH_VOXCPM" = "1" ]; then
+  echo "VoxCPM2: yes"
+else
+  warn "VoxCPM2: skipped (${MEM_GB} GB RAM) — use the \"AI (លឿន)\" voices, or a Colab GPU link in Admin → VoxCPM2."
+fi
+[ "$DISK_GB" -lt 15 ] && warn "Less than 15 GB free disk."
+SWAP_GB=$([ "$WITH_VOXCPM" = "1" ] && echo 8 || echo 4)
 if [ "$MEM_GB" -lt 8 ] && ! swapon --show | grep -q .; then
-  say "Adding an 8 GB swap file so the model can load"
-  fallocate -l 8G /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
+  say "Adding a ${SWAP_GB} GB swap file (building PyTorch needs the room)"
+  fallocate -l "${SWAP_GB}G" /swapfile && chmod 600 /swapfile && mkswap /swapfile >/dev/null && swapon /swapfile
   grep -q '^/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
 fi
 
@@ -47,8 +57,15 @@ touch .env
 set_env() { # key value file — add or replace
   if grep -q "^$1=" "$3"; then sed -i "s|^$1=.*|$1=$2|" "$3"; else echo "$1=$2" >> "$3"; fi
 }
-grep -q '^STUDIO_HOST=' .env || set_env STUDIO_HOST dub.184-174-38-113.sslip.io .env
-grep -q '^BOT_HOST=' .env || set_env BOT_HOST bot.184-174-38-113.sslip.io .env
+PUBLIC_IP="$(curl -4 -fs --max-time 5 https://checkip.amazonaws.com || curl -4 -fs --max-time 5 https://api.ipify.org || hostname -I | awk '{print $1}')"
+PUBLIC_IP="$(echo "$PUBLIC_IP" | tr -d '[:space:]')"
+DASHED="${PUBLIC_IP//./-}"
+grep -q '^STUDIO_HOST=' .env || set_env STUDIO_HOST "dub.${DASHED}.sslip.io" .env
+grep -q '^BOT_HOST=' .env || set_env BOT_HOST "bot.${DASHED}.sslip.io" .env
+case "$(grep '^STUDIO_HOST=' .env | cut -d= -f2)" in
+  *sslip.io) [ -n "$DASHED" ] && ! grep -q "^STUDIO_HOST=.*${DASHED}" .env && \
+    warn "STUDIO_HOST in .env points at another IP than this VPS (${PUBLIC_IP}) — fix it: STUDIO_HOST=dub.${DASHED}.sslip.io" ;;
+esac
 set_env STUDIO_GIT_REF "$STUDIO_REF" .env
 grep -q '^VOXCPM_API_KEY=.\+' .env || set_env VOXCPM_API_KEY "$(openssl rand -hex 24)" .env
 if ! grep -q '^STUDIO_TELEGRAM_ADMIN_IDS=.\+' .env.studio; then
@@ -67,9 +84,19 @@ if ss -tlnp | grep -E ':(80|443) ' | grep -vq docker; then
   warn "Something other than Docker listens on port 80/443:"; ss -tlnp | grep -E ':(80|443) '
 fi
 
-say "Build (first time 20-40 min: PyTorch, Demucs, VoxCPM2)"
-docker compose build --pull studio voxcpm
-docker compose up -d studio voxcpm caddy
+if [ "$WITH_VOXCPM" = "1" ]; then
+  say "Build (first time 20-40 min: PyTorch, Demucs, VoxCPM2)"
+  docker compose build --pull studio voxcpm
+  docker compose up -d studio voxcpm caddy
+else
+  say "Build (first time 15-25 min: PyTorch, Demucs)"
+  docker compose build --pull studio
+  docker compose up -d studio caddy
+fi
+if grep -q '^DUBBER_BOT_TOKEN=.\+' .env; then
+  say "Telegram bot"
+  docker compose --profile dubber-bot up -d --build dubber-bot
+fi
 
 say "Status"
 docker compose ps
@@ -80,6 +107,8 @@ for i in $(seq 1 30); do
   fi
   sleep 5
 done
-echo "VoxCPM2: downloading/loading the model can take 10-30 minutes the first time."
-echo "         Follow it with: docker compose -f $APP_DIR/docker-compose.yml logs -f voxcpm"
+if [ "$WITH_VOXCPM" = "1" ]; then
+  echo "VoxCPM2: downloading/loading the model can take 10-30 minutes the first time."
+  echo "         Follow it with: docker compose -f $APP_DIR/docker-compose.yml logs -f voxcpm"
+fi
 echo "Bot: set DUBBING_STUDIO_URL=https://${HOST}/ where the bot runs (Railway → Variables)."
