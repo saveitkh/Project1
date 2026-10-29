@@ -6,6 +6,12 @@
 	reverse_proxy studio:3000
 }
 
+# Khmer Sonic AI (voice clone / lyrics / AI song) Mini App
+{$SONG_HOST} {
+	encode gzip
+	reverse_proxy song:3000
+}
+
 # This bot's web service (only answers when started with --profile bot)
 {$BOT_HOST} {
 	encode gzip

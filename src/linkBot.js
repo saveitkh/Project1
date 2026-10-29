@@ -369,6 +369,12 @@ export async function handleMessage(message) {
             reply_markup: { inline_keyboard: [[{ text: t.dubbingButton, web_app: { url: config.dubbingStudioUrl } }]] },
           })
         : send(chatId, t.dubbingMissing);
+    case "song":
+      return config.songStudioUrl
+        ? send(chatId, t.songOpen, {
+            reply_markup: { inline_keyboard: [[{ text: t.songButton, web_app: { url: config.songStudioUrl } }]] },
+          })
+        : send(chatId, t.songMissing);
     default:
       break;
   }
@@ -656,6 +662,7 @@ function commandAction(text) {
     case "/language": return "language";
     case "/app": return "app";
     case "/dubbing": return "dubbing";
+    case "/song": return "song";
     case "/buy": return "buy";
     case "/free": return "free";
     case "/premium": return "premium";
