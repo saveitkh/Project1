@@ -44,6 +44,9 @@ services:
       - PUBLIC_URL=https://${SONG_HOST:?Set SONG_HOST, e.g. song.184-174-38-113.sslip.io}
       # Telegram Mini App auth: same bot token the bot logs people in with.
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_LOGIN_BOT_TOKEN:-}
+      # Set SONG_ALLOW_BROWSER_DEMO=on in .env to preview the app in a plain
+      # browser (no Telegram) with mock data. Keep off for real production.
+      - ALLOW_BROWSER_DEMO=${SONG_ALLOW_BROWSER_DEMO:-off}
       # Engines — all optional; default mock so it runs with zero keys.
       - VOICE_PROVIDER=${SONG_VOICE_PROVIDER:-mock}
       - LYRICS_PROVIDER=${SONG_LYRICS_PROVIDER:-mock}
