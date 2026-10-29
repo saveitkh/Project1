@@ -62,6 +62,8 @@ PUBLIC_IP="$(echo "$PUBLIC_IP" | tr -d '[:space:]')"
 DASHED="${PUBLIC_IP//./-}"
 grep -q '^STUDIO_HOST=' .env || set_env STUDIO_HOST "dub.${DASHED}.sslip.io" .env
 grep -q '^BOT_HOST=' .env || set_env BOT_HOST "bot.${DASHED}.sslip.io" .env
+# Khmer Sonic AI Mini App: docker-compose refuses to start without SONG_HOST
+grep -q '^SONG_HOST=' .env || set_env SONG_HOST "song.${DASHED}.sslip.io" .env
 case "$(grep '^STUDIO_HOST=' .env | cut -d= -f2)" in
   *sslip.io) [ -n "$DASHED" ] && ! grep -q "^STUDIO_HOST=.*${DASHED}" .env && \
     warn "STUDIO_HOST in .env points at another IP than this VPS (${PUBLIC_IP}) — fix it: STUDIO_HOST=dub.${DASHED}.sslip.io" ;;
@@ -86,12 +88,12 @@ fi
 
 if [ "$WITH_VOXCPM" = "1" ]; then
   say "Build (first time 20-40 min: PyTorch, Demucs, VoxCPM2)"
-  docker compose build --pull studio voxcpm
-  docker compose up -d studio voxcpm caddy
+  docker compose build --pull studio voxcpm song
+  docker compose up -d studio voxcpm song caddy
 else
   say "Build (first time 15-25 min: PyTorch, Demucs)"
-  docker compose build --pull studio
-  docker compose up -d studio caddy
+  docker compose build --pull studio song
+  docker compose up -d studio song caddy
 fi
 if grep -q '^DUBBER_BOT_TOKEN=.\+' .env; then
   say "Telegram bot"
@@ -111,4 +113,12 @@ if [ "$WITH_VOXCPM" = "1" ]; then
   echo "VoxCPM2: downloading/loading the model can take 10-30 minutes the first time."
   echo "         Follow it with: docker compose -f $APP_DIR/docker-compose.yml logs -f voxcpm"
 fi
+SONG=$(grep '^SONG_HOST=' .env | cut -d= -f2)
+for i in $(seq 1 12); do
+  if docker compose exec -T song node -e "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+    echo "Song: up → https://${SONG}/  (check: curl https://${SONG}/api/health)"; break
+  fi
+  sleep 5
+done
 echo "Bot: set DUBBING_STUDIO_URL=https://${HOST}/ where the bot runs (Railway → Variables)."
+echo "Bot: set SONG_STUDIO_URL=https://${SONG}/ too, and add that URL in @BotFather (Mini Apps)."
