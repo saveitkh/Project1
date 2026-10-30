@@ -3,6 +3,7 @@ import { db, rows } from "./db.js";
 import { config } from "./config.js";
 import * as botJobs from "./botJobs.js";
 import * as botPay from "./botPay.js";
+import * as classroom from "./classroom.js";
 import { applyAutoRules, processQueue, requeueOrphanedDownloads } from "./downloader.js";
 import * as forwarder from "./forwarder.js";
 import * as mirror from "./mirror.js";
@@ -72,6 +73,10 @@ export async function loop() {
       // Bot purchases: ask Bakong about open orders, lapse stale ones.
       const paid = await botPay.checkPendingOrders();
       if (paid) console.log(`Bakong confirmed ${paid} bot order(s)`);
+
+      // Classroom auto messages (/auto in a teacher's group) that are due.
+      const autos = await classroom.runDueAutoMessages();
+      if (autos) console.log(`Sent ${autos} classroom auto message(s)`);
 
       if (await anyAccountAuthorized()) await onePass();
     } catch (err) {
