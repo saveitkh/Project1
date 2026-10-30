@@ -175,6 +175,29 @@ chain is resolved first and refused if it lands on a loopback, link-local or
 private address: this process holds the Supabase service-role key and the R2
 secret, so a pasted URL must not be able to point it at its own network.
 
+## Classroom tools (teacher groups)
+
+Add the bot to a class group (it does not need to be an admin). Group admins are treated as teachers. Send `/class` in the
+group for the full list. Run the Saveit-project migration
+`20261030120000_classroom.sql` first.
+
+- `/joinbutton` posts a ✋ button; students tap it once to join the roster
+  (or type `/join A` to join team A).
+- `/settag <names per message> <seconds>` — e.g. `/settag 5 4`.
+- `/tagall [text]`, `/tagteam <team> [text]` — mentions every student, in
+  batches, even students without a @username.
+- `/check <text>` — a message with a ✅ button; the teacher's
+  🔔 button re-tags only the students who have not tapped it.
+- `/auto <times> <minutes> [tag|tag:A] <text>` — repeat a message
+  (`0` times = until `/autostop`). `/autolist`, `/autostop <n|all>`.
+- `/dm <text>` — a private message to every student who has started the bot.
+- `/stop` — stops a tag run in progress.
+
+Telegram lets a bot post about 20 messages a minute into one group, so a
+run never goes faster than one message every 3 seconds, and a 429 is waited
+out and resumed. 200 students at 10 names a message is 20 messages, about
+one minute.
+
 ## Notes on the Telegram library
 
 This uses [teleproto](https://www.npmjs.com/package/teleproto), the maintained
